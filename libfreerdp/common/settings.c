@@ -949,6 +949,9 @@ BOOL freerdp_get_param_bool(rdpSettings* settings, int id)
 		case FreeRDP_PlayRemoteFx:
 			return settings->PlayRemoteFx;
 
+		case FreeRDP_ExternalTransport:
+			return settings->ExternalTransport;
+
 		case FreeRDP_GatewayUseSameCredentials:
 			return settings->GatewayUseSameCredentials;
 
@@ -1413,6 +1416,10 @@ int freerdp_set_param_bool(rdpSettings* settings, int id, BOOL param)
 
 		case FreeRDP_PlayRemoteFx:
 			settings->PlayRemoteFx = param;
+			break;
+
+		case FreeRDP_ExternalTransport:
+			settings->ExternalTransport = param;
 			break;
 
 		case FreeRDP_GatewayUseSameCredentials:

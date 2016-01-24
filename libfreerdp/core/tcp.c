@@ -1049,6 +1049,9 @@ int freerdp_tcp_connect(rdpContext* context, rdpSettings* settings,
 	BOOL ipcSocket = FALSE;
 	BOOL useExternalDefinedSocket = FALSE;
 
+	if (settings->ExternalTransport)
+		return TRUE;
+
 	if (!hostname)
 		return -1;
 
@@ -1065,8 +1068,10 @@ int freerdp_tcp_connect(rdpContext* context, rdpSettings* settings,
 		if (sockfd < 0)
 			return -1;
 	}
-        else if (useExternalDefinedSocket)
-	  sockfd = port;
+	else if (useExternalDefinedSocket)
+	{
+		sockfd = port;
+	}
 	else
 	{
 		sockfd = -1;
