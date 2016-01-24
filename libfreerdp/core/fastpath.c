@@ -332,7 +332,7 @@ static int fastpath_recv_update(rdpFastPath* fastpath, BYTE updateCode, UINT32 s
 			if (!update_read_pointer_new(s, &pointer->pointer_new))
 			{
 				WLog_ERR(TAG, "FASTPATH_UPDATETYPE_POINTER - update_read_pointer_new()");
-				return -1;
+				//return -1; /* workaround */
 			}
 			IFCALL(pointer->PointerNew, context, &pointer->pointer_new);
 			break;
@@ -391,12 +391,23 @@ static int fastpath_recv_update_data(rdpFastPath* fastpath, wStream* s)
 
 	if (Stream_GetRemainingLength(s) < size)
 	{
-		WLog_ERR(TAG, "Stream_GetRemainingLength() < size");
+		WLog_ERR(TAG, "insufficient fastpath data: actual: %d expected: %d",
+			Stream_GetRemainingLength(s), size);
 		return -1;
 	}
 
 	cs = s;
 	next_pos = Stream_GetPosition(s) + size;
+
+	if (rdp->settings->ReplayMode && rdp->settings->EncomspVirtualChannel && 0)
+	{
+		if (compressionFlags && (fragmentation == FASTPATH_FRAGMENT_SINGLE))
+		{
+			WLog_WARN(TAG, "ignoring compressed fastpath packet (%d bytes)", size);
+			Stream_SetPosition(s, next_pos);
+			return 1; /* ignore problematic compressed packets in replay mode */
+		}
+	}
 
 	bulkStatus = bulk_decompress(rdp->bulk, Stream_Pointer(s), size, &pDstData, &DstSize, compressionFlags);
 

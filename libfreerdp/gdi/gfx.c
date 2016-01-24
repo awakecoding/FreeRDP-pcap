@@ -1012,6 +1012,7 @@ UINT gdi_SurfaceToCache(RdpgfxClientContext* context, RDPGFX_SURFACE_TO_CACHE_PD
 	if (!cacheEntry)
 		return ERROR_INTERNAL_ERROR;
 
+	cacheEntry->cacheKey = surfaceToCache->cacheKey;
 	cacheEntry->width = (UINT32) (rect->right - rect->left);
 	cacheEntry->height = (UINT32) (rect->bottom - rect->top);
 	cacheEntry->alpha = surface->alpha;
@@ -1085,7 +1086,99 @@ UINT gdi_CacheToSurface(RdpgfxClientContext* context, RDPGFX_CACHE_TO_SURFACE_PD
  */
 UINT gdi_CacheImportReply(RdpgfxClientContext* context, RDPGFX_CACHE_IMPORT_REPLY_PDU* cacheImportReply)
 {
+	UINT16 index;
+	UINT16 count;
+	UINT16* slots;
+	UINT16 cacheSlot;
+	gdiGfxCacheEntry* cacheEntry;
+	rdpGdi* gdi = (rdpGdi*) context->custom;
+
+	slots = cacheImportReply->cacheSlots;
+	count = cacheImportReply->importedEntriesCount;
+
+	for (index = 0; index < count; index++)
+	{
+		cacheSlot = slots[index];
+
+		cacheEntry = (gdiGfxCacheEntry*) context->GetCacheSlotData(context, cacheSlot);
+
+		if (cacheEntry)
+			continue;
+
+		cacheEntry = (gdiGfxCacheEntry*) calloc(1, sizeof(gdiGfxCacheEntry));
+
+		if (!cacheEntry)
+			return ERROR_INTERNAL_ERROR;
+
+		cacheEntry->width = 0;
+		cacheEntry->height = 0;
+		cacheEntry->alpha = FALSE;
+
+		cacheEntry->format = (!gdi->invert) ? PIXEL_FORMAT_XRGB32 : PIXEL_FORMAT_XBGR32;
+
+		cacheEntry->scanline = (cacheEntry->width + (cacheEntry->width % 4)) * 4;
+		cacheEntry->data = NULL;
+
+		context->SetCacheSlotData(context, cacheSlot, (void*) cacheEntry);
+	}
+
 	return CHANNEL_RC_OK;
+}
+
+UINT gdi_ImportCacheEntry(RdpgfxClientContext* context, UINT16 cacheSlot, PERSISTENT_CACHE_ENTRY* importCacheEntry)
+{
+	gdiGfxCacheEntry* cacheEntry;
+	rdpGdi* gdi = (rdpGdi*) context->custom;
+
+	cacheEntry = (gdiGfxCacheEntry*) calloc(1, sizeof(gdiGfxCacheEntry));
+
+	if (!cacheEntry)
+		return ERROR_INTERNAL_ERROR;
+
+	cacheEntry->cacheKey = importCacheEntry->key64;
+	cacheEntry->width = (UINT32) importCacheEntry->width;
+	cacheEntry->height = (UINT32) importCacheEntry->height;
+	cacheEntry->alpha = FALSE;
+
+	cacheEntry->format = (!gdi->invert) ? PIXEL_FORMAT_XRGB32 : PIXEL_FORMAT_XBGR32;
+
+	cacheEntry->scanline = (cacheEntry->width + (cacheEntry->width % 4)) * 4;
+	cacheEntry->data = (BYTE*) calloc(1, cacheEntry->scanline * cacheEntry->height);
+
+	if (!cacheEntry->data)
+	{
+		free(cacheEntry);
+		return ERROR_INTERNAL_ERROR;
+	}
+
+	freerdp_image_copy(cacheEntry->data, cacheEntry->format, cacheEntry->scanline,
+		0, 0, cacheEntry->width, cacheEntry->height, importCacheEntry->data,
+		PIXEL_FORMAT_XRGB32, -1, 0, 0, NULL);
+
+	context->SetCacheSlotData(context, cacheSlot, (void*) cacheEntry);
+
+	return CHANNEL_RC_OK;
+}
+
+UINT gdi_ExportCacheEntry(RdpgfxClientContext* context, UINT16 cacheSlot, PERSISTENT_CACHE_ENTRY* exportCacheEntry)
+{
+	gdiGfxCacheEntry* cacheEntry;
+	rdpGdi* gdi = (rdpGdi*) context->custom;
+
+	cacheEntry = (gdiGfxCacheEntry*) context->GetCacheSlotData(context, cacheSlot);
+
+	if (cacheEntry)
+	{
+		exportCacheEntry->key64 = cacheEntry->cacheKey;
+		exportCacheEntry->width = cacheEntry->width;
+		exportCacheEntry->height = cacheEntry->height;
+		exportCacheEntry->size = cacheEntry->width * cacheEntry->height * 4;
+		exportCacheEntry->flags = 0;
+		exportCacheEntry->data = cacheEntry->data;
+		return CHANNEL_RC_OK;
+	}
+
+	return ERROR_NOT_FOUND;
 }
 
 /**
@@ -1103,9 +1196,9 @@ UINT gdi_EvictCacheEntry(RdpgfxClientContext* context, RDPGFX_EVICT_CACHE_ENTRY_
 	{
 		free(cacheEntry->data);
 		free(cacheEntry);
-	}
 
-	context->SetCacheSlotData(context, evictCacheEntry->cacheSlot, NULL);
+		context->SetCacheSlotData(context, evictCacheEntry->cacheSlot, NULL);
+	}
 
 	return CHANNEL_RC_OK;
 }
@@ -1160,6 +1253,8 @@ void gdi_graphics_pipeline_init(rdpGdi* gdi, RdpgfxClientContext* gfx)
 	gfx->SurfaceToCache = gdi_SurfaceToCache;
 	gfx->CacheToSurface = gdi_CacheToSurface;
 	gfx->CacheImportReply = gdi_CacheImportReply;
+	gfx->ImportCacheEntry = gdi_ImportCacheEntry;
+	gfx->ExportCacheEntry = gdi_ExportCacheEntry;
 	gfx->EvictCacheEntry = gdi_EvictCacheEntry;
 	gfx->MapSurfaceToOutput = gdi_MapSurfaceToOutput;
 	gfx->MapSurfaceToWindow = gdi_MapSurfaceToWindow;
@@ -1172,4 +1267,3 @@ void gdi_graphics_pipeline_uninit(rdpGdi* gdi, RdpgfxClientContext* gfx)
 	gdi->gfx = NULL;
 	gfx->custom = NULL;
 }
-

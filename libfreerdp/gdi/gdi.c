@@ -365,8 +365,8 @@ INLINE BYTE* gdi_get_bitmap_pointer(HGDI_DC hdcBmp, int x, int y)
 	}
 	else
 	{
-		WLog_ERR(TAG,  "gdi_get_bitmap_pointer: requesting invalid pointer: (%d,%d) in %dx%d",
-			x, y, hBmp->width, hBmp->height);
+		//WLog_ERR(TAG,  "gdi_get_bitmap_pointer: requesting invalid pointer: (%d,%d) in %dx%d",
+		//	x, y, hBmp->width, hBmp->height);
 		return 0;
 	}
 }
@@ -1058,7 +1058,7 @@ static BOOL gdi_surface_bits(rdpContext* context, SURFACE_BITS_COMMAND* cmd)
 		cmd->destLeft, cmd->destTop, cmd->destRight, cmd->destBottom,
 		cmd->bpp, cmd->codecID, cmd->width, cmd->height, cmd->bitmapDataLength);
 
-	if (cmd->codecID == RDP_CODEC_ID_REMOTEFX)
+	if ((cmd->codecID == RDP_CODEC_ID_REMOTEFX) || (cmd->codecID == RDP_CODEC_ID_IMAGE_REMOTEFX))
 	{
 		if (!freerdp_client_codecs_prepare(gdi->codecs, FREERDP_CODEC_REMOTEFX,
 										   gdi->width, gdi->height))

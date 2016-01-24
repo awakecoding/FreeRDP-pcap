@@ -80,6 +80,7 @@
 
 #include <freerdp/log.h>
 
+#include <winpr/print.h>
 #include <winpr/stream.h>
 
 #include "tcp.h"
@@ -1065,8 +1066,10 @@ int freerdp_tcp_connect(rdpContext* context, rdpSettings* settings,
 		if (sockfd < 0)
 			return -1;
 	}
-        else if (useExternalDefinedSocket)
-	  sockfd = port;
+	else if (useExternalDefinedSocket)
+	{
+		sockfd = port;
+	}
 	else
 	{
 		sockfd = -1;

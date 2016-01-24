@@ -64,8 +64,8 @@ int winpr_bitmap_write(const char* filename, BYTE* data, int width, int height, 
 	bi.biPlanes = 1;
 	bi.biBitCount = bpp;
 	bi.biCompression = 0;
-	bi.biXPelsPerMeter = width;
-	bi.biYPelsPerMeter = height;
+	bi.biXPelsPerMeter = 0;
+	bi.biYPelsPerMeter = 0;
 	bi.biClrUsed = 0;
 	bi.biClrImportant = 0;
 	bi.biSize = sizeof(WINPR_BITMAP_INFO_HEADER);

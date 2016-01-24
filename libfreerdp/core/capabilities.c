@@ -536,7 +536,7 @@ BOOL rdp_read_order_capability_set(wStream* s, UINT16 length, rdpSettings* setti
 	if (settings->BitmapCacheV3Enabled && BitmapCacheV3Enabled)
 		settings->BitmapCacheVersion = 3;
 	else
-		settings ->BitmapCacheV3Enabled = FALSE;
+		settings->BitmapCacheV3Enabled = FALSE;
 
 	if (settings->FrameMarkerCommandEnabled && !FrameMarkerCommandEnabled)
 		settings->FrameMarkerCommandEnabled = FALSE;
@@ -1799,7 +1799,14 @@ BOOL rdp_write_bitmap_cache_v2_capability_set(wStream* s, rdpSettings* settings)
 	cacheFlags = ALLOW_CACHE_WAITING_LIST_FLAG;
 
 	if (settings->BitmapCachePersistEnabled)
+	{
 		cacheFlags |= PERSISTENT_KEYS_EXPECTED_FLAG;
+		settings->BitmapCacheV2CellInfo[0].persistent = 1;
+		settings->BitmapCacheV2CellInfo[1].persistent = 1;
+		settings->BitmapCacheV2CellInfo[2].persistent = 1;
+		settings->BitmapCacheV2CellInfo[3].persistent = 1;
+		settings->BitmapCacheV2CellInfo[4].persistent = 1;
+	}
 
 	Stream_Write_UINT16(s, cacheFlags); /* cacheFlags (2 bytes) */
 	Stream_Write_UINT8(s, 0); /* pad2 (1 byte) */

@@ -297,6 +297,8 @@ int freerdp_channels_data(freerdp* instance, UINT16 channelId, BYTE* data, int d
 	rdpChannels* channels;
 	rdpMcsChannel* channel = NULL;
 	CHANNEL_OPEN_DATA* pChannelOpenData;
+	rdpContext* context = instance->context;
+	rdpSettings* settings = context->settings;
 
 	mcs = instance->context->rdp->mcs;
 	channels = instance->context->channels;
