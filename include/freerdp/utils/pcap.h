@@ -23,6 +23,8 @@
 #include <freerdp/api.h>
 #include <freerdp/types.h>
 
+#pragma pack(push, 1)
+
 struct _pcap_header
 {
 	UINT32 magic_number;   /* magic number */
@@ -43,6 +45,8 @@ struct _pcap_record_header
 	UINT32 orig_len;       /* actual length of packet */
 };
 typedef struct _pcap_record_header pcap_record_header;
+
+#pragma pack(pop)
 
 typedef struct _pcap_record pcap_record;
 

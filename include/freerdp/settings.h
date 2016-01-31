@@ -690,6 +690,7 @@ typedef struct _RDPDR_PARALLEL RDPDR_PARALLEL;
 #define FreeRDP_DumpRemoteFxFile				1858
 #define FreeRDP_PlayRemoteFxFile				1859
 #define FreeRDP_ExternalTransport				1860
+#define FreeRDP_ExternalSecurity				1861
 #define FreeRDP_GatewayUsageMethod				1984
 #define FreeRDP_GatewayPort					1985
 #define FreeRDP_GatewayHostname					1986
@@ -1131,7 +1132,8 @@ struct rdp_settings
 	ALIGN64 char* DumpRemoteFxFile; /* 1858 */
 	ALIGN64 char* PlayRemoteFxFile; /* 1859 */
 	ALIGN64 BOOL ExternalTransport; /* 1860 */
-	UINT64 padding1920[1920 - 1861]; /* 1861 */
+	ALIGN64 BOOL ExternalSecurity; /* 1861 */
+	UINT64 padding1920[1920 - 1862]; /* 1862 */
 	UINT64 padding1984[1984 - 1920]; /* 1920 */
 
 	/**
