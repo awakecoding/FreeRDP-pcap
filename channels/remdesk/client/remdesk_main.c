@@ -137,7 +137,7 @@ static UINT remdesk_read_channel_header(wStream* s, REMDESK_CHANNEL_HEADER* head
 
 	if (Stream_GetRemainingLength(s) < 8)
 	{
-		WLog_ERR(TAG, "Not enought data!");
+		WLog_ERR(TAG, "Not enough data!");
 		return ERROR_INVALID_DATA;
 	}
 
@@ -158,7 +158,7 @@ static UINT remdesk_read_channel_header(wStream* s, REMDESK_CHANNEL_HEADER* head
 
 	if (Stream_GetRemainingLength(s) < ChannelNameLen)
 	{
-		WLog_ERR(TAG, "Not enought data!");
+		WLog_ERR(TAG, "Not enough data!");
 		return ERROR_INVALID_DATA;
 	}
 
@@ -254,7 +254,7 @@ static UINT remdesk_recv_ctl_version_info_pdu(remdeskPlugin* remdesk, wStream* s
 
 	if (Stream_GetRemainingLength(s) < 8)
 	{
-		WLog_ERR(TAG, "Not enought data!");
+		WLog_ERR(TAG, "Not enough data!");
 		return ERROR_INVALID_DATA;
 	}
 
@@ -315,7 +315,7 @@ static UINT remdesk_recv_ctl_result_pdu(remdeskPlugin* remdesk, wStream* s, REMD
 
 	if (Stream_GetRemainingLength(s) < 4)
 	{
-		WLog_ERR(TAG, "Not enought data!");
+		WLog_ERR(TAG, "Not enough data!");
 		return ERROR_INVALID_DATA;
 	}
 
@@ -566,7 +566,7 @@ static UINT remdesk_recv_ctl_pdu(remdeskPlugin* remdesk, wStream* s, REMDESK_CHA
 
 	if (Stream_GetRemainingLength(s) < 4)
 	{
-		WLog_ERR(TAG, "Not enought data!");
+		WLog_ERR(TAG, "Not enough data!");
 		return ERROR_INVALID_DATA;
 	}
 
@@ -871,7 +871,7 @@ static UINT remdesk_virtual_channel_event_data_received(remdeskPlugin* remdesk,
 	{
 		if (Stream_Capacity(data_in) != Stream_GetPosition(data_in))
 		{
-			WLog_ERR(TAG,  "read error");
+			WLog_ERR(TAG, "read error");
 			return ERROR_INTERNAL_ERROR;
 		}
 
@@ -885,6 +885,7 @@ static UINT remdesk_virtual_channel_event_data_received(remdeskPlugin* remdesk,
 			return ERROR_INTERNAL_ERROR;
 		}
 	}
+
 	return CHANNEL_RC_OK;
 }
 
@@ -904,6 +905,9 @@ static VOID VCAPITYPE remdesk_virtual_channel_open_event(DWORD openHandle, UINT 
 
 	switch (event)
 	{
+		case CHANNEL_EVENT_INITIALIZED:
+			break;
+
 		case CHANNEL_EVENT_DATA_RECEIVED:
 			if ((error = remdesk_virtual_channel_event_data_received(remdesk, pData, dataLength, totalLength, dataFlags)))
 				WLog_ERR(TAG, "remdesk_virtual_channel_event_data_received failed with error %lu!", error);
@@ -919,11 +923,10 @@ static VOID VCAPITYPE remdesk_virtual_channel_open_event(DWORD openHandle, UINT 
 		default:
 			WLog_ERR(TAG, "unhandled event %lu!", event);
 			error = ERROR_INTERNAL_ERROR;
-
 	}
+
 	if (error && remdesk->rdpcontext)
 		setChannelError(remdesk->rdpcontext, error, "remdesk_virtual_channel_open_event reported an error");
-
 }
 
 static void* remdesk_virtual_channel_client_thread(void* arg)

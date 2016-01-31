@@ -264,10 +264,7 @@ static BOOL transport_bio_pcap_next(BIO* bio)
 	if (!ptr->plength)
 	{
 		if (!pcap_has_next_record(ptr->pcap))
-		{
-			ResetEvent(ptr->event);
 			return FALSE;
-		}
 
 		if (!pcap_get_next_record_header(ptr->pcap, &ptr->record))
 			return FALSE;
@@ -292,8 +289,18 @@ static BOOL transport_bio_pcap_next(BIO* bio)
 
 		if (!ptr->srcAddress)
 		{
-			ptr->srcAddress = ptr->ipv4.SourceAddress;
-			ptr->dstAddress = ptr->ipv4.DestinationAddress;
+			if (ptr->plength != 19)
+			{
+				/* first packet is sent by the client */
+				ptr->srcAddress = ptr->ipv4.SourceAddress;
+				ptr->dstAddress = ptr->ipv4.DestinationAddress;
+			}
+			else
+			{
+				/* first packet is sent by the server */
+				ptr->srcAddress = ptr->ipv4.DestinationAddress;
+				ptr->dstAddress = ptr->ipv4.SourceAddress;
+			}
 		}
 
 		if (ptr->srcAddress == ptr->ipv4.SourceAddress)
@@ -343,7 +350,7 @@ static int transport_bio_pcap_read(BIO* bio, char* buf, int size)
 	BIO_clear_flags(bio, BIO_FLAGS_READ);
 
 	if (!transport_bio_pcap_next(bio))
-		return -1;
+		goto failure;
 
 	status = ptr->plength - ptr->poffset;
 
@@ -353,9 +360,7 @@ static int transport_bio_pcap_read(BIO* bio, char* buf, int size)
 	status = fread(buf, 1, status, ptr->pcap->fp);
 
 	if (status < 0)
-	{
-		return -1;
-	}
+		goto failure;
 
 	ptr->poffset += status;
 
@@ -368,6 +373,11 @@ static int transport_bio_pcap_read(BIO* bio, char* buf, int size)
 	BIO_set_flags(bio, (BIO_FLAGS_READ | BIO_FLAGS_SHOULD_RETRY));
 
 	return status;
+
+failure:
+	BIO_clear_flags(bio, BIO_FLAGS_SHOULD_RETRY);
+	ResetEvent(ptr->event);
+	return -1;
 }
 
 static int transport_bio_pcap_puts(BIO* bio, const char* str)
