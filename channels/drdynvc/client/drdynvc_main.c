@@ -478,8 +478,8 @@ UINT dvcman_create_channel(IWTSVirtualChannelManager* pChannelMgr, UINT32 Channe
 				context = dvcman->drdynvc->context;
 				IFCALLRET(context->OnChannelConnected, error, context, ChannelName, listener->iface.pInterface);
 
-                if (error)
-                    WLog_ERR(TAG, "context.ReceiveSamples failed with error %lu", error);
+				if (error)
+					WLog_ERR(TAG, "context.ReceiveSamples failed with error %lu", error);
 
 				return error;
 			}

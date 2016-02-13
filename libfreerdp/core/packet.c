@@ -116,6 +116,9 @@ int freerdp_packet_client_to_server(rdpContext* context, wStream* s, UINT32 time
 
 		settings->ChannelCount = mcs->channelCount;
 
+		settings->DynamicChannelCount = 0;
+		settings->SupportDynamicChannels = FALSE;
+
 		for (index = 0; index < mcs->channelCount; index++)
 		{
 			name = mcs->channels[index].Name;
@@ -135,6 +138,16 @@ int freerdp_packet_client_to_server(rdpContext* context, wStream* s, UINT32 time
 		}
 
 		mcs_initialize_client_channels(mcs, settings);
+
+		if (settings->SupportDynamicChannels)
+		{
+			settings->SupportGraphicsPipeline = TRUE;
+		}
+		else
+		{
+			settings->SupportGraphicsPipeline = FALSE;
+			settings->RemoteFxCodec = TRUE;
+		}
 	}
 
 	return 1;
@@ -355,7 +368,11 @@ static BOOL transport_bio_pcap_next(BIO* bio)
 	if (!ptr->plength)
 	{
 		if (!pcap_has_next_record(ptr->pcap))
+		{
+			WLog_WARN(TAG, "end of stream");
+			Sleep(10000);
 			return FALSE;
+		}
 
 		if (!pcap_get_next_record_header(ptr->pcap, &ptr->record))
 			return FALSE;
