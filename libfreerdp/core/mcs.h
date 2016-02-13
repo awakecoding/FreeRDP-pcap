@@ -189,6 +189,7 @@ BOOL mcs_read_domain_mcspdu_header(wStream* s, enum DomainMCSPDU* domainMCSPDU, 
 void mcs_write_domain_mcspdu_header(wStream* s, enum DomainMCSPDU domainMCSPDU, UINT16 length, BYTE options);
 
 BOOL mcs_client_begin(rdpMcs* mcs);
+int mcs_initialize_client_channels(rdpMcs* mcs, rdpSettings* settings);
 
 rdpMcs* mcs_new(rdpTransport* transport);
 void mcs_free(rdpMcs* mcs);

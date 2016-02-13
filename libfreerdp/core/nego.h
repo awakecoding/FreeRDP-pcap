@@ -160,4 +160,6 @@ void nego_set_send_preconnection_pdu(rdpNego* nego, BOOL SendPreconnectionPdu);
 void nego_set_preconnection_id(rdpNego* nego, UINT32 PreconnectionId);
 void nego_set_preconnection_blob(rdpNego* nego, char* PreconnectionBlob);
 
+BOOL nego_read_request_token_or_cookie(rdpNego* nego, wStream* s);
+
 #endif /* __NEGO_H */

@@ -138,6 +138,9 @@ BOOL pcap_add_record(rdpPcap* pcap, void* data, UINT32 length)
 
 BOOL pcap_has_next_record(rdpPcap* pcap)
 {
+	if (!pcap)
+		return FALSE;
+
 	if (pcap->file_size - (ftell(pcap->fp)) <= 16)
 		return FALSE;
 

@@ -299,6 +299,7 @@ BOOL transport_connect(rdpTransport* transport, const char* hostname, UINT16 por
 				return FALSE;
 
 			BIO_set_conn_hostname(socketBio, hostname);
+			BIO_ctrl(socketBio, BIO_C_SET_RDP_CONTEXT, 0, (void*) context);
 
 			bufferedBio = BIO_new(BIO_s_buffered_socket());
 

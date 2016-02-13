@@ -1289,8 +1289,10 @@ static void VCAPITYPE encomsp_virtual_channel_init_event(LPVOID pInitHandle, UIN
 		case CHANNEL_EVENT_TERMINATED:
 			encomsp_virtual_channel_event_terminated(encomsp);
 			break;
+
 		default:
 			WLog_ERR(TAG, "Unhandled event type %d", event);
+			break;
 	}
 
 	if (error && encomsp->rdpcontext)

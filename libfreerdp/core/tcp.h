@@ -49,6 +49,7 @@
 #define BIO_C_WRITE_BLOCKED		1106
 #define BIO_C_WAIT_READ			1107
 #define BIO_C_WAIT_WRITE		1108
+#define BIO_C_SET_RDP_CONTEXT		1200
 
 #define BIO_set_socket(b, s, c)		BIO_ctrl(b, BIO_C_SET_SOCKET, c, s);
 #define BIO_get_socket(b, c)		BIO_ctrl(b, BIO_C_GET_SOCKET, 0, (char*) c)

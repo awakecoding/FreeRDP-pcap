@@ -106,4 +106,6 @@ struct rdp_channels
 	DrdynvcClientContext* drdynvc;
 };
 
+CHANNEL_OPEN_DATA* freerdp_channels_find_channel_open_data_by_name(rdpChannels* channels, const char* name);
+
 #endif /* FREERDP_CORE_CLIENT_H */
