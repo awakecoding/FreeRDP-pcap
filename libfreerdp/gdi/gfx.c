@@ -993,6 +993,37 @@ UINT gdi_CacheToSurface(RdpgfxClientContext* context, RDPGFX_CACHE_TO_SURFACE_PD
  */
 UINT gdi_CacheImportReply(RdpgfxClientContext* context, RDPGFX_CACHE_IMPORT_REPLY_PDU* cacheImportReply)
 {
+	UINT16 index;
+	UINT16 count;
+	UINT16* slots;
+	UINT16 cacheSlot;
+	gdiGfxCacheEntry* cacheEntry;
+	rdpGdi* gdi = (rdpGdi*) context->custom;
+
+	slots = cacheImportReply->cacheSlots;
+	count = cacheImportReply->importedEntriesCount;
+
+	for (index = 0; index < count; index++)
+	{
+		cacheSlot = slots[index];
+
+		cacheEntry = (gdiGfxCacheEntry*) calloc(1, sizeof(gdiGfxCacheEntry));
+
+		if (!cacheEntry)
+			return ERROR_INTERNAL_ERROR;
+
+		cacheEntry->width = 0;
+		cacheEntry->height = 0;
+		cacheEntry->alpha = FALSE;
+
+		cacheEntry->format = (!gdi->invert) ? PIXEL_FORMAT_XRGB32 : PIXEL_FORMAT_XBGR32;
+
+		cacheEntry->scanline = (cacheEntry->width + (cacheEntry->width % 4)) * 4;
+		cacheEntry->data = NULL;
+
+		context->SetCacheSlotData(context, cacheSlot, (void*) cacheEntry);
+	}
+
 	return CHANNEL_RC_OK;
 }
 

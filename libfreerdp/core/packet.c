@@ -368,11 +368,7 @@ static BOOL transport_bio_pcap_next(BIO* bio)
 	if (!ptr->plength)
 	{
 		if (!pcap_has_next_record(ptr->pcap))
-		{
-			WLog_WARN(TAG, "end of stream");
-			Sleep(10000);
 			return FALSE;
-		}
 
 		if (!pcap_get_next_record_header(ptr->pcap, &ptr->record))
 			return FALSE;

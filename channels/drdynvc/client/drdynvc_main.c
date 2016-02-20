@@ -1232,19 +1232,31 @@ void drdynvc_remove_open_handle_data(DWORD openHandle)
 static UINT drdynvc_virtual_channel_event_data_received(drdynvcPlugin* drdynvc,
 		void* pData, UINT32 dataLength, UINT32 totalLength, UINT32 dataFlags)
 {
+	UINT error;
 	wStream* data_in;
 
 	if ((dataFlags & CHANNEL_FLAG_SUSPEND) || (dataFlags & CHANNEL_FLAG_RESUME))
-	{
 		return CHANNEL_RC_OK;
-	}
 
 	if (dataFlags & CHANNEL_FLAG_FIRST)
 	{
-		if (drdynvc->data_in)
-			Stream_Free(drdynvc->data_in, TRUE);
+		drdynvc->totalLength = totalLength;
 
-		drdynvc->data_in = Stream_New(NULL, totalLength);
+		if (drdynvc->async)
+		{
+			if (drdynvc->data_in)
+				Stream_Free(drdynvc->data_in, TRUE);
+
+			drdynvc->data_in = Stream_New(NULL, totalLength);
+		}
+		else
+		{
+			if (!drdynvc->data_in)
+				drdynvc->data_in = Stream_New(NULL, totalLength);
+
+			Stream_SetPosition(drdynvc->data_in, 0);
+			Stream_EnsureCapacity(drdynvc->data_in, totalLength);
+		}
 	}
 
 	if (!(data_in = drdynvc->data_in))
@@ -1265,22 +1277,40 @@ static UINT drdynvc_virtual_channel_event_data_received(drdynvcPlugin* drdynvc,
 
 	if (dataFlags & CHANNEL_FLAG_LAST)
 	{
-		if (Stream_Capacity(data_in) != Stream_GetPosition(data_in))
+		if (drdynvc->totalLength != Stream_GetPosition(data_in))
 		{
 			WLog_ERR(TAG, "drdynvc_plugin_process_received: read error");
 			return ERROR_INVALID_DATA;
 		}
 
-		drdynvc->data_in = NULL;
 		Stream_SealLength(data_in);
 		Stream_SetPosition(data_in, 0);
 
-		if (!MessageQueue_Post(drdynvc->queue, NULL, 0, (void*) data_in, NULL))
+		if (drdynvc->async)
 		{
-			WLog_ERR(TAG, "MessageQueue_Post failed!");
-			return ERROR_INTERNAL_ERROR;
+			drdynvc->data_in = NULL;
+
+			if (!MessageQueue_Post(drdynvc->queue, NULL, 0, (void*) data_in, NULL))
+			{
+				WLog_ERR(TAG, "MessageQueue_Post failed!");
+				return ERROR_INTERNAL_ERROR;
+			}
+		}
+		else
+		{
+			error = drdynvc_order_recv(drdynvc, data_in);
+
+			Stream_SetPosition(data_in, 0);
+			Stream_SetLength(data_in, 0);
+
+			if (error)
+			{
+				WLog_ERR(TAG, "drdynvc_order_recv failed with error %lu!", error);
+				return error;
+			}
 		}
 	}
+
 	return CHANNEL_RC_OK;
 }
 
@@ -1312,9 +1342,9 @@ static void VCAPITYPE drdynvc_virtual_channel_open_event(DWORD openHandle, UINT 
 		case CHANNEL_EVENT_USER:
 			break;
 	}
+
 	if (error && drdynvc->rdpcontext)
 		setChannelError(drdynvc->rdpcontext, error, "drdynvc_virtual_channel_open_event reported an error");
-
 }
 
 static void* drdynvc_virtual_channel_client_thread(void* arg)
@@ -1358,6 +1388,7 @@ static void* drdynvc_virtual_channel_client_thread(void* arg)
 
 	if (error && drdynvc->rdpcontext)
 		setChannelError(drdynvc->rdpcontext, error, "drdynvc_virtual_channel_client_thread reported an error");
+
 	ExitThread((DWORD) error);
 	return NULL;
 }
@@ -1391,15 +1422,8 @@ static UINT drdynvc_virtual_channel_event_connected(drdynvcPlugin* drdynvc, LPVO
 		return error;
 	}
 
-	drdynvc->queue = MessageQueue_New(NULL);
-	if (!drdynvc->queue)
-	{
-		error = CHANNEL_RC_NO_MEMORY;
-		WLog_ERR(TAG, "MessageQueue_New failed!");
-		goto error;
-	}
-
 	drdynvc->channel_mgr = dvcman_new(drdynvc);
+
 	if (!drdynvc->channel_mgr)
 	{
 		error = CHANNEL_RC_NO_MEMORY;
@@ -1423,12 +1447,26 @@ static UINT drdynvc_virtual_channel_event_connected(drdynvcPlugin* drdynvc, LPVO
 
 	drdynvc->state = DRDYNVC_STATE_CAPABILITIES;
 
-	if (!(drdynvc->thread = CreateThread(NULL, 0,
-			(LPTHREAD_START_ROUTINE) drdynvc_virtual_channel_client_thread, (void*) drdynvc, 0, NULL)))
+	if (drdynvc->async)
 	{
-		error = ERROR_INTERNAL_ERROR;
-		WLog_ERR(TAG, "CreateThread failed!");
-		goto error;
+		drdynvc->queue = MessageQueue_New(NULL);
+
+		if (!drdynvc->queue)
+		{
+			error = CHANNEL_RC_NO_MEMORY;
+			WLog_ERR(TAG, "MessageQueue_New failed!");
+			goto error;
+		}
+
+		drdynvc->thread = CreateThread(NULL, 0,
+			(LPTHREAD_START_ROUTINE) drdynvc_virtual_channel_client_thread, (void*) drdynvc, 0, NULL);
+
+		if (!drdynvc->thread)
+		{
+			error = ERROR_INTERNAL_ERROR;
+			WLog_ERR(TAG, "CreateThread failed!");
+			goto error;
+		}
 	}
 
 	return CHANNEL_RC_OK;
@@ -1449,18 +1487,21 @@ static UINT drdynvc_virtual_channel_event_disconnected(drdynvcPlugin* drdynvc)
 {
 	UINT status;
 
-	if (MessageQueue_PostQuit(drdynvc->queue, 0) && (WaitForSingleObject(drdynvc->thread, INFINITE) == WAIT_FAILED))
-    {
-        status = GetLastError();
-        WLog_ERR(TAG, "WaitForSingleObject failed with error %lu", status);
-        return status;
-    }
+	if (drdynvc->async)
+	{
+		if (MessageQueue_PostQuit(drdynvc->queue, 0) &&
+			(WaitForSingleObject(drdynvc->thread, INFINITE) == WAIT_FAILED))
+		{
+			status = GetLastError();
+			WLog_ERR(TAG, "WaitForSingleObject failed with error %lu", status);
+			return status;
+		}
 
-	MessageQueue_Free(drdynvc->queue);
-	CloseHandle(drdynvc->thread);
-
-	drdynvc->queue = NULL;
-	drdynvc->thread = NULL;
+		MessageQueue_Free(drdynvc->queue);
+		CloseHandle(drdynvc->thread);
+		drdynvc->queue = NULL;
+		drdynvc->thread = NULL;
+	}
 
 	status = drdynvc->channelEntryPoints.pVirtualChannelClose(drdynvc->OpenHandle);
 
@@ -1483,6 +1524,7 @@ static UINT drdynvc_virtual_channel_event_disconnected(drdynvcPlugin* drdynvc)
 	}
 
 	drdynvc_remove_open_handle_data(drdynvc->OpenHandle);
+
 	return status;
 }
 
@@ -1549,10 +1591,10 @@ int drdynvc_get_version(DrdynvcClientContext* context)
 BOOL VCAPITYPE VirtualChannelEntry(PCHANNEL_ENTRY_POINTS pEntryPoints)
 {
 	UINT rc;
+	UINT error;
 	drdynvcPlugin* drdynvc;
 	DrdynvcClientContext* context;
 	CHANNEL_ENTRY_POINTS_FREERDP* pEntryPointsEx;
-	UINT error;
 
 	drdynvc = (drdynvcPlugin*) calloc(1, sizeof(drdynvcPlugin));
 
@@ -1568,6 +1610,8 @@ BOOL VCAPITYPE VirtualChannelEntry(PCHANNEL_ENTRY_POINTS pEntryPoints)
 		CHANNEL_OPTION_COMPRESS_RDP;
 
 	strcpy(drdynvc->channelDef.name, "drdynvc");
+
+	//drdynvc->async = TRUE;
 
 	drdynvc->state = DRDYNVC_STATE_INITIAL;
 
