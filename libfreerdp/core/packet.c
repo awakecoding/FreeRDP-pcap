@@ -23,6 +23,8 @@
 
 #include <freerdp/log.h>
 #include <freerdp/packet.h>
+#include <freerdp/crypto/per.h>
+#include <freerdp/channels/rdpgfx.h>
 
 #include <winpr/crt.h>
 #include <winpr/print.h>
@@ -32,6 +34,7 @@
 #include "tcp.h"
 #include "rdp.h"
 #include "client.h"
+#include "server.h"
 
 #define TAG FREERDP_TAG("core")
 
@@ -55,7 +58,7 @@ struct _WINPR_BIO_PCAP
 };
 typedef struct _WINPR_BIO_PCAP WINPR_BIO_PCAP;
 
-int freerdp_packet_receive_channel_data(freerdp* instance, UINT16 channelId, BYTE* data, int dataSize, int flags, int totalSize)
+int freerdp_packet_client_recv_channel_data(freerdp* instance, UINT16 channelId, BYTE* data, int dataSize, int flags, int totalSize)
 {
 	UINT32 index;
 	rdpMcs* mcs;
@@ -98,6 +101,344 @@ int freerdp_packet_receive_channel_data(freerdp* instance, UINT16 channelId, BYT
 	}
 
 	return 0;
+}
+
+static const char* RDPGFX_CMDID_STRINGS[] =
+{
+	"RDPGFX_CMDID_UNUSED_0000",
+	"RDPGFX_CMDID_WIRETOSURFACE_1",
+	"RDPGFX_CMDID_WIRETOSURFACE_2",
+	"RDPGFX_CMDID_DELETEENCODINGCONTEXT",
+	"RDPGFX_CMDID_SOLIDFILL",
+	"RDPGFX_CMDID_SURFACETOSURFACE",
+	"RDPGFX_CMDID_SURFACETOCACHE",
+	"RDPGFX_CMDID_CACHETOSURFACE",
+	"RDPGFX_CMDID_EVICTCACHEENTRY",
+	"RDPGFX_CMDID_CREATESURFACE",
+	"RDPGFX_CMDID_DELETESURFACE",
+	"RDPGFX_CMDID_STARTFRAME",
+	"RDPGFX_CMDID_ENDFRAME",
+	"RDPGFX_CMDID_FRAMEACKNOWLEDGE",
+	"RDPGFX_CMDID_RESETGRAPHICS",
+	"RDPGFX_CMDID_MAPSURFACETOOUTPUT",
+	"RDPGFX_CMDID_CACHEIMPORTOFFER",
+	"RDPGFX_CMDID_CACHEIMPORTREPLY",
+	"RDPGFX_CMDID_CAPSADVERTISE",
+	"RDPGFX_CMDID_CAPSCONFIRM",
+	"RDPGFX_CMDID_UNUSED_0014",
+	"RDPGFX_CMDID_MAPSURFACETOWINDOW"
+};
+
+static const char* rdpgfx_get_cmd_id_string(UINT16 cmdId)
+{
+	if (cmdId <= RDPGFX_CMDID_MAPSURFACETOWINDOW)
+		return RDPGFX_CMDID_STRINGS[cmdId];
+	else
+		return "RDPGFX_CMDID_UNKNOWN";
+}
+
+int freerdp_packet_server_recv_rdpgfx_data(rdpContext* context, wStream* s)
+{
+	RDPGFX_HEADER header;
+
+	if (Stream_GetRemainingLength(s) < 8)
+		return -1;
+
+	Stream_Read_UINT16(s, header.cmdId); /* cmdId (2 bytes) */
+	Stream_Read_UINT16(s, header.flags); /* flags (2 bytes) */
+	Stream_Read_UINT32(s, header.pduLength); /* pduLength (4 bytes) */
+
+	if (header.cmdId == RDPGFX_CMDID_FRAMEACKNOWLEDGE)
+	{
+		if (Stream_GetRemainingLength(s) < 12)
+			return -1;
+
+		Stream_Seek_UINT32(s); /* queueDepth (4 bytes) */
+		Stream_Seek_UINT32(s); /* frameId (4 bytes) */
+		Stream_Seek_UINT32(s); /* totalFramesDecoded (4 bytes) */
+	}
+
+	WLog_WARN(TAG, "EGFX cmdId: %s (0x%04X) flags: 0x%04X pduLength: %d",
+		rdpgfx_get_cmd_id_string(header.cmdId), header.cmdId, header.flags, header.pduLength);
+
+	return 1;
+}
+
+struct DRDYNVC_PCAP
+{
+	wStream* staticData;
+	UINT32 staticLength;
+	wStream* dynamicData;
+	UINT32 dynamicLength;
+};
+typedef struct DRDYNVC_PCAP DRDYNVC_PCAP;
+
+static DRDYNVC_PCAP g_DrDynVC = { NULL, 0, NULL, 0 };
+
+int freerdp_packet_server_recv_dynamic_data(rdpContext* context, wStream* s, UINT32 channelId)
+{
+	const char* channelName;
+	rdpChannels* channels = context->channels;
+
+	if (!channels->drdynvc)
+		return 1;
+
+	channelName = channels->drdynvc->GetChannelName(channels->drdynvc, channelId);
+
+	if (!strcmp(channelName, RDPGFX_DVC_CHANNEL_NAME))
+	{
+		freerdp_packet_server_recv_rdpgfx_data(context, s);
+	}
+
+	return 1;
+}
+
+static UINT32 drdynvc_read_variable_uint(wStream* s, int cbLen)
+{
+	UINT32 val = 0;
+
+	if (cbLen == 0)
+		Stream_Read_UINT8(s, val);
+	else if (cbLen == 1)
+		Stream_Read_UINT16(s, val);
+	else
+		Stream_Read_UINT32(s, val);
+
+	return val;
+}
+
+UINT freerdp_packet_server_recv_drdynvc_data(rdpContext* context, BYTE* data, UINT32 dataLength, UINT32 totalLength, UINT32 dataFlags)
+{
+	DRDYNVC_PCAP* drdynvc = &g_DrDynVC;
+
+	if ((dataFlags & CHANNEL_FLAG_SUSPEND) || (dataFlags & CHANNEL_FLAG_RESUME))
+		return CHANNEL_RC_OK;
+
+	if (dataFlags & CHANNEL_FLAG_FIRST)
+	{
+		drdynvc->staticLength = totalLength;
+
+		if (!drdynvc->staticData)
+			drdynvc->staticData = Stream_New(NULL, totalLength);
+
+		Stream_SetPosition(drdynvc->staticData, 0);
+		Stream_EnsureCapacity(drdynvc->staticData, totalLength);
+	}
+
+	if (!drdynvc->staticData)
+		return CHANNEL_RC_NO_MEMORY;
+
+	if (!Stream_EnsureRemainingCapacity(drdynvc->staticData, (size_t) dataLength))
+	{
+		Stream_Free(drdynvc->staticData, TRUE);
+		drdynvc->staticData = NULL;
+		return ERROR_INTERNAL_ERROR;
+	}
+
+	Stream_Write(drdynvc->staticData, data, dataLength);
+
+	if (dataFlags & CHANNEL_FLAG_LAST)
+	{
+		int cmd;
+		int sp;
+		int cbChId;
+		BYTE value;
+		UINT32 channelId;
+		UINT32 dataSize;
+
+		Stream_SealLength(drdynvc->staticData);
+		Stream_SetPosition(drdynvc->staticData, 0);
+
+		{
+			if (Stream_GetRemainingLength(drdynvc->staticData) < 1)
+				return ERROR_INVALID_DATA;
+
+			Stream_Read_UINT8(drdynvc->staticData, value);
+
+			cmd = (value & 0xF0) >> 4;
+			sp = (value & 0x0C) >> 2;
+			cbChId = (value & 0x03);
+
+			if ((cmd == DATA_FIRST_PDU) || (cmd == DATA_PDU))
+			{
+				channelId = drdynvc_read_variable_uint(drdynvc->staticData, cbChId);
+
+				dataSize = Stream_GetRemainingLength(drdynvc->staticData);
+
+				if (cmd == DATA_FIRST_PDU)
+				{
+					drdynvc->dynamicLength = drdynvc_read_variable_uint(drdynvc->staticData, sp);
+
+					if (!drdynvc->dynamicData)
+						drdynvc->dynamicData = Stream_New(NULL, drdynvc->dynamicLength);
+
+					Stream_SetPosition(drdynvc->dynamicData, 0);
+					Stream_EnsureCapacity(drdynvc->dynamicData, drdynvc->dynamicLength);
+				}
+				else if (cmd == DATA_PDU)
+				{
+					if (!drdynvc->dynamicLength)
+						drdynvc->dynamicLength = dataSize;
+
+					if (!drdynvc->dynamicData)
+						drdynvc->dynamicData = Stream_New(NULL, drdynvc->dynamicLength);
+
+					Stream_SetPosition(drdynvc->dynamicData, 0);
+					Stream_EnsureCapacity(drdynvc->dynamicData, drdynvc->dynamicLength);
+				}
+
+				if (!drdynvc->dynamicData)
+					return ERROR_INTERNAL_ERROR;
+
+				if ((Stream_GetPosition(drdynvc->dynamicData) + dataSize) > drdynvc->dynamicLength)
+					return ERROR_INVALID_DATA;
+
+				if (!Stream_EnsureRemainingCapacity(drdynvc->dynamicData, dataSize))
+					return ERROR_INTERNAL_ERROR;
+
+				Stream_Copy(drdynvc->dynamicData, drdynvc->staticData, dataSize);
+
+				if (((UINT32) Stream_GetPosition(drdynvc->dynamicData)) >= drdynvc->dynamicLength)
+				{
+					Stream_SealLength(drdynvc->dynamicData);
+					Stream_SetPosition(drdynvc->dynamicData, 0);
+
+					freerdp_packet_server_recv_dynamic_data(context, drdynvc->dynamicData, channelId);
+
+					drdynvc->dynamicLength = 0;
+				}
+			}
+			else if (cmd == CAPABILITY_REQUEST_PDU)
+			{
+				UINT16 version;
+
+				if (Stream_GetRemainingLength(drdynvc->staticData) < 3)
+					return ERROR_INVALID_DATA;
+
+				Stream_Seek_UINT8(drdynvc->staticData); /* pad */
+				Stream_Read_UINT16(drdynvc->staticData, version); /* version */
+
+				if ((version == 2) || (version == 3))
+				{
+					if (Stream_GetRemainingLength(drdynvc->staticData) < 8)
+						return ERROR_INVALID_DATA;
+
+					Stream_Seek_UINT16(drdynvc->staticData); /* PriorityCharge0 */
+					Stream_Seek_UINT16(drdynvc->staticData); /* PriorityCharge1 */
+					Stream_Seek_UINT16(drdynvc->staticData); /* PriorityCharge2 */
+					Stream_Seek_UINT16(drdynvc->staticData); /* PriorityCharge3 */
+				}
+			}
+
+			Stream_SetPosition(drdynvc->staticData, 0);
+			Stream_SetLength(drdynvc->staticData, 0);
+		}
+	}
+
+	return CHANNEL_RC_OK;
+}
+
+int freerdp_packet_server_recv_channel_data(freerdp* instance, UINT16 channelId, BYTE* data, int dataSize, int flags, int totalSize)
+{
+	UINT32 index;
+	rdpMcs* mcs;
+	rdpChannels* channels;
+	rdpMcsChannel* channel = NULL;
+	CHANNEL_OPEN_DATA* pChannelOpenData;
+	rdpContext* context = instance->context;
+	rdpSettings* settings = context->settings;
+
+	mcs = instance->context->rdp->mcs;
+	channels = instance->context->channels;
+
+	if (!channels || !mcs)
+		return 1;
+
+	for (index = 0; index < mcs->channelCount; index++)
+	{
+		if (mcs->channels[index].ChannelId == channelId)
+		{
+			channel = &mcs->channels[index];
+			break;
+		}
+	}
+
+	if (!channel)
+		return 1;
+
+	if (!strcmp(channel->Name, "drdynvc"))
+	{
+		UINT error;
+
+		pChannelOpenData = freerdp_channels_find_channel_open_data_by_name(channels, channel->Name);
+
+		if (!pChannelOpenData)
+			return 1;
+
+		error = freerdp_packet_server_recv_drdynvc_data(context, data, dataSize, totalSize, flags);
+
+		if (error)
+			WLog_WARN(TAG, "freerdp_packet_server_recv_drdynvc_data: 0x%04X", error);
+	}
+
+	return 0;
+}
+
+BOOL freerdp_packet_read_header(wStream* s, UINT16* length, UINT16* channelId)
+{
+	BYTE li;
+	BYTE byte;
+	BYTE code;
+	BYTE choice;
+	UINT16 initiator;
+	enum DomainMCSPDU MCSPDU;
+	enum DomainMCSPDU domainMCSPDU;
+
+	MCSPDU = DomainMCSPDU_SendDataRequest;
+
+	*length = tpkt_read_header(s);
+
+	if (!tpdu_read_header(s, &code, &li))
+		return FALSE;
+
+	if (code != X224_TPDU_DATA)
+	{
+		if (code == X224_TPDU_DISCONNECT_REQUEST)
+			return TRUE;
+
+		return FALSE;
+	}
+
+	if (!per_read_choice(s, &choice))
+		return FALSE;
+
+	domainMCSPDU = (enum DomainMCSPDU) (choice >> 2);
+
+	if (domainMCSPDU != MCSPDU)
+	{
+		if (domainMCSPDU != DomainMCSPDU_DisconnectProviderUltimatum)
+			return FALSE;
+	}
+
+	MCSPDU = domainMCSPDU;
+
+	if ((size_t) (*length - 8) > Stream_GetRemainingLength(s))
+		return FALSE;
+
+	if (Stream_GetRemainingLength(s) < 5)
+		return FALSE;
+
+	per_read_integer16(s, &initiator, MCS_BASE_CHANNEL_ID); /* initiator (UserId) */
+	per_read_integer16(s, channelId, 0); /* channelId */
+	Stream_Read_UINT8(s, byte); /* dataPriority + Segmentation (0x70) */
+
+	if (!per_read_length(s, length)) /* userData (OCTET_STRING) */
+		return FALSE;
+
+	if (*length > Stream_GetRemainingLength(s))
+		return FALSE;
+
+	return TRUE;
 }
 
 int freerdp_packet_client_to_server(rdpContext* context, wStream* s, UINT32 timestamp)
@@ -147,6 +488,34 @@ int freerdp_packet_client_to_server(rdpContext* context, wStream* s, UINT32 time
 		{
 			settings->SupportGraphicsPipeline = FALSE;
 			settings->RemoteFxCodec = TRUE;
+		}
+	}
+	else if (rdp->state == CONNECTION_STATE_ACTIVE)
+	{
+		if (tpkt_verify_header(s))
+		{
+			UINT16 length;
+			UINT16 channelId = 0;
+
+			if (!freerdp_packet_read_header(s, &length, &channelId))
+				return 1;
+
+			if (channelId != MCS_GLOBAL_CHANNEL_ID)
+			{
+				UINT32 length;
+				UINT32 flags;
+				int chunkLength;
+
+				if (Stream_GetRemainingLength(s) < 8)
+					return FALSE;
+
+				Stream_Read_UINT32(s, length);
+				Stream_Read_UINT32(s, flags);
+				chunkLength = Stream_GetRemainingLength(s);
+
+				freerdp_packet_server_recv_channel_data(context->instance,
+					channelId, Stream_Pointer(s), chunkLength, flags, length);
+			}
 		}
 	}
 
@@ -548,7 +917,7 @@ static long transport_bio_pcap_ctrl(BIO* bio, int cmd, long arg1, void* arg2)
 		freerdp* instance = context->instance;
 
 		ptr->context = context;
-		instance->ReceiveChannelData = freerdp_packet_receive_channel_data;
+		instance->ReceiveChannelData = freerdp_packet_client_recv_channel_data;
 	}
 
 	switch (cmd)

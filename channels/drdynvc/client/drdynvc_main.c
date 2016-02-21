@@ -1585,6 +1585,19 @@ int drdynvc_get_version(DrdynvcClientContext* context)
 	return drdynvc->version;
 }
 
+const char* drdynvc_get_channel_name(DrdynvcClientContext* context, UINT32 channelId)
+{
+	DVCMAN_CHANNEL* channel;
+	drdynvcPlugin* drdynvc = (drdynvcPlugin*) context->handle;
+
+	channel = (DVCMAN_CHANNEL*) dvcman_find_channel_by_id(drdynvc->channel_mgr, channelId);
+
+	if (!channel)
+		return NULL;
+
+	return channel->channel_name;
+}
+
 /* drdynvc is always built-in */
 #define VirtualChannelEntry	drdynvc_VirtualChannelEntry
 
@@ -1635,6 +1648,8 @@ BOOL VCAPITYPE VirtualChannelEntry(PCHANNEL_ENTRY_POINTS pEntryPoints)
 		drdynvc->context = context;
 
 		context->GetVersion = drdynvc_get_version;
+		context->GetChannelName = drdynvc_get_channel_name;
+
 		drdynvc->rdpcontext = pEntryPointsEx->context;
 
 		*(pEntryPointsEx->ppInterface) = (void*) context;
