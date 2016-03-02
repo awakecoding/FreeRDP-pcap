@@ -564,6 +564,9 @@ static UINT rdpgfx_recv_wire_to_surface_1_pdu(RDPGFX_CHANNEL_CALLBACK* callback,
 	pdu.bitmapData = Stream_Pointer(s);
 	Stream_Seek(s, pdu.bitmapDataLength);
 
+	if (pdu.codecId == 5)
+		pdu.codecId = RDPGFX_CODECID_CAVIDEO; /* Lync RDP workaround */
+
 	WLog_DBG(TAG, "RecvWireToSurface1Pdu: surfaceId: %d codecId: %s (0x%04X) pixelFormat: 0x%04X "
 			"destRect: left: %d top: %d right: %d bottom: %d bitmapDataLength: %d",
 			(int) pdu.surfaceId, rdpgfx_get_codec_id_string(pdu.codecId), pdu.codecId, pdu.pixelFormat,
@@ -617,6 +620,9 @@ static UINT rdpgfx_recv_wire_to_surface_2_pdu(RDPGFX_CHANNEL_CALLBACK* callback,
 
 	pdu.bitmapData = Stream_Pointer(s);
 	Stream_Seek(s, pdu.bitmapDataLength);
+
+	if (pdu.codecId == 5)
+		pdu.codecId = RDPGFX_CODECID_CAVIDEO; /* Lync RDP workaround */
 
 	WLog_DBG(TAG, "RecvWireToSurface2Pdu: surfaceId: %d codecId: %s (0x%04X) "
 			"codecContextId: %d pixelFormat: 0x%04X bitmapDataLength: %d",
