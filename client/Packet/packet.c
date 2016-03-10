@@ -42,8 +42,6 @@
 
 void pf_OnChannelConnectedEventHandler(rdpContext* context, ChannelConnectedEventArgs* e)
 {
-	rdpSettings* settings = context->settings;
-
 	if (strcmp(e->name, RDPGFX_DVC_CHANNEL_NAME) == 0)
 	{
 		gdi_graphics_pipeline_init(context->gdi, (RdpgfxClientContext*) e->pInterface);
@@ -52,8 +50,6 @@ void pf_OnChannelConnectedEventHandler(rdpContext* context, ChannelConnectedEven
 
 void pf_OnChannelDisconnectedEventHandler(rdpContext* context, ChannelDisconnectedEventArgs* e)
 {
-	rdpSettings* settings = context->settings;
-
 	if (strcmp(e->name, RDPGFX_DVC_CHANNEL_NAME) == 0)
 	{
 		gdi_graphics_pipeline_uninit(context->gdi, (RdpgfxClientContext*) e->pInterface);
@@ -102,8 +98,6 @@ BOOL pf_end_paint(pfContext* pfc)
 
 BOOL pf_desktop_resize(pfContext* pfc)
 {
-	rdpContext* context = (rdpContext*) pfc;
-	rdpSettings* settings = pfc->settings;
 	freerdp* instance = pfc->instance;
 
 	gdi_free(instance);
@@ -119,7 +113,6 @@ BOOL pf_pre_connect(freerdp* instance)
 	rdpContext* context = instance->context;
 	rdpSettings* settings = context->settings;
 	rdpChannels* channels = context->channels;
-	pfContext* pfc = (pfContext*) context;
 
 	settings->AsyncInput = FALSE;
 	settings->AsyncUpdate = FALSE;
@@ -161,11 +154,12 @@ BOOL pf_pre_connect(freerdp* instance)
 	settings->ExternalTransport = TRUE;
 	settings->ExternalSecurity = TRUE;
 	settings->CompressionEnabled = FALSE;
+	settings->IgnoreCertificate = TRUE;
 
-	settings->RdpSecurity = TRUE;
-	settings->TlsSecurity = TRUE;
-	settings->NlaSecurity = FALSE;
-	settings->NegotiateSecurityLayer = FALSE;
+	//settings->RdpSecurity = TRUE;
+	//settings->TlsSecurity = TRUE;
+	//settings->NlaSecurity = FALSE;
+	//settings->NegotiateSecurityLayer = FALSE;
 
 	settings->SupportGraphicsPipeline = FALSE;
 
@@ -188,7 +182,6 @@ BOOL pf_pre_connect(freerdp* instance)
 BOOL pf_post_connect(freerdp* instance)
 {
 	rdpContext* context = instance->context;
-	pfContext* pfc = (pfContext*) context;
 	rdpSettings* settings = context->settings;
 	rdpChannels* channels = context->channels;
 	rdpUpdate* update = context->update;
@@ -208,14 +201,9 @@ BOOL pf_post_connect(freerdp* instance)
 	return TRUE;
 }
 
-BOOL pf_post_disconnect(freerdp* instance)
+void pf_post_disconnect(freerdp* instance)
 {
-	rdpContext* context = instance->context;
-	pfContext* pfc = (pfContext*) context;
-
 	gdi_free(instance);
-
-	return TRUE;
 }
 
 static BOOL pf_authenticate(freerdp* instance, char** username, char** password, char** domain)
@@ -233,9 +221,9 @@ BOOL pf_verify_certificate(freerdp* instance, char* subject, char* issuer, char*
 	return TRUE;
 }
 
-BOOL pf_logon_error_info(freerdp* instance, UINT32 data, UINT32 type)
+int pf_logon_error_info(freerdp* instance, UINT32 data, UINT32 type)
 {
-	return TRUE;
+	return 1;
 }
 
 DWORD WINAPI pf_client_thread(LPVOID lpParam)
@@ -252,7 +240,10 @@ DWORD WINAPI pf_client_thread(LPVOID lpParam)
 	instance = context->instance;
 
 	if (!freerdp_connect(instance))
+	{
+		ExitThread(0);
 		return 0;
+	}
 
 	while (1)
 	{
@@ -342,7 +333,6 @@ void pfreerdp_client_free(freerdp* instance, rdpContext* context)
 int pfreerdp_client_start(rdpContext* context)
 {
 	pfContext* pfc = (pfContext*) context;
-	freerdp* instance = context->instance;
 
 	pfc->thread = CreateThread(NULL, 0, pf_client_thread, (void*) context, 0, NULL);
 
