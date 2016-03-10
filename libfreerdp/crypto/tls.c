@@ -589,11 +589,10 @@ out_free:
 	return NULL;
 }
 
-
-#if defined(__APPLE__)
-BOOL tls_prepare(rdpTls* tls, BIO* underlying, SSL_METHOD* method, int options, BOOL clientMode)
+#if OPENSSL_VERSION_NUMBER >= 0x010000000L
+static BOOL tls_prepare(rdpTls* tls, BIO* underlying, const SSL_METHOD* method, int options, BOOL clientMode)
 #else
-BOOL tls_prepare(rdpTls* tls, BIO* underlying, const SSL_METHOD* method, int options, BOOL clientMode)
+static BOOL tls_prepare(rdpTls* tls, BIO* underlying, SSL_METHOD* method, int options, BOOL clientMode)
 #endif
 {
 	rdpSettings* settings = tls->settings;
@@ -807,6 +806,10 @@ int tls_connect(rdpTls* tls, BIO* underlying)
 	if (!tls_prepare(tls, underlying, SSLv23_client_method(), options, TRUE))
 		return FALSE;
 
+#ifndef OPENSSL_NO_TLSEXT
+	SSL_set_tlsext_host_name(tls->ssl, tls->hostname);
+#endif
+
 	return tls_do_handshake(tls, TRUE);
 }
 
@@ -823,9 +826,12 @@ static void tls_openssl_tlsext_debug_callback(SSL *s, int client_server,
 }
 #endif
 
-BOOL tls_accept(rdpTls* tls, BIO* underlying, const char* cert_file, const char* privatekey_file)
+BOOL tls_accept(rdpTls* tls, BIO* underlying, rdpSettings *settings)
 {
 	long options = 0;
+	BIO *bio;
+	RSA *rsa;
+	X509 *x509;
 
 	/**
 	 * SSL_OP_NO_SSLv2:
@@ -867,16 +873,85 @@ BOOL tls_accept(rdpTls* tls, BIO* underlying, const char* cert_file, const char*
 	if (!tls_prepare(tls, underlying, SSLv23_server_method(), options, FALSE))
 		return FALSE;
 
-	if (SSL_use_RSAPrivateKey_file(tls->ssl, privatekey_file, SSL_FILETYPE_PEM) <= 0)
+	if (settings->PrivateKeyFile)
 	{
-		WLog_ERR(TAG, "SSL_CTX_use_RSAPrivateKey_file failed");
-		WLog_ERR(TAG, "PrivateKeyFile: %s", privatekey_file);
+		bio = BIO_new_file(settings->PrivateKeyFile, "rb+");
+		if (!bio)
+		{
+			WLog_ERR(TAG, "BIO_new_file failed for private key %s", settings->PrivateKeyFile);
+			return FALSE;
+		}
+	}
+	else if (settings->PrivateKeyContent)
+	{
+		bio = BIO_new_mem_buf(settings->PrivateKeyContent, strlen(settings->PrivateKeyContent));
+		if (!bio)
+		{
+			WLog_ERR(TAG, "BIO_new_mem_buf failed for private key");
+			return FALSE;
+		}
+	}
+	else
+	{
+		WLog_ERR(TAG, "no private key defined");
 		return FALSE;
 	}
 
-	if (SSL_use_certificate_file(tls->ssl, cert_file, SSL_FILETYPE_PEM) <= 0)
+	rsa = PEM_read_bio_RSAPrivateKey(bio, NULL, NULL, NULL);
+	BIO_free(bio);
+
+	if (!rsa)
+	{
+		WLog_ERR(TAG, "invalid private key");
+		return FALSE;
+	}
+
+	if (SSL_use_RSAPrivateKey(tls->ssl, rsa) <= 0)
+	{
+		WLog_ERR(TAG, "SSL_CTX_use_RSAPrivateKey_file failed");
+		RSA_free(rsa);
+		return FALSE;
+	}
+
+
+	if (settings->CertificateFile)
+	{
+		bio = BIO_new_file(settings->CertificateFile, "rb+");
+		if (!bio)
+		{
+			WLog_ERR(TAG, "BIO_new_file failed for certificate %s", settings->CertificateFile);
+			return FALSE;
+		}
+	}
+	else if (settings->CertificateContent)
+	{
+		bio = BIO_new_mem_buf(settings->CertificateContent, strlen(settings->CertificateContent));
+		if (!bio)
+		{
+			WLog_ERR(TAG, "BIO_new_mem_buf failed for certificate");
+			return FALSE;
+		}
+	}
+	else
+	{
+		WLog_ERR(TAG, "no certificate defined");
+		return FALSE;
+	}
+
+	x509 = PEM_read_bio_X509(bio, NULL, NULL, 0);
+	BIO_free(bio);
+
+	if (!x509)
+	{
+		WLog_ERR(TAG, "invalid certificate");
+		return FALSE;
+	}
+
+
+	if (SSL_use_certificate(tls->ssl, x509) <= 0)
 	{
 		WLog_ERR(TAG, "SSL_use_certificate_file failed");
+		X509_free(x509);
 		return FALSE;
 	}
 
@@ -1171,31 +1246,16 @@ int tls_verify_certificate(rdpTls* tls, CryptoCert cert, char* hostname, int por
 
 	/* if the certificate is valid and the certificate name matches, verification succeeds */
 	if (certificate_status && hostname_match)
-	{
-		if (common_name)
-		{
-			free(common_name);
-			common_name = NULL;
-		}
-
 		verification_status = TRUE; /* success! */
-	}
-
-	/* if the certificate is valid but the certificate name does not match, warn user, do not accept */
-	if (certificate_status && !hostname_match)
-		tls_print_certificate_name_mismatch_error(hostname, port,
-							  common_name, alt_names,
-							  alt_names_count);
 
 	/* verification could not succeed with OpenSSL, use known_hosts file and prompt user for manual verification */
-
-	if (!certificate_status)
+	if (!certificate_status || !hostname_match)
 	{
 		char* issuer;
 		char* subject;
 		char* fingerprint;
 		freerdp* instance = (freerdp*) tls->settings->instance;
-		BOOL accept_certificate = FALSE;
+		DWORD accept_certificate = 0;
 
 		issuer = crypto_cert_issuer(cert->px509);
 		subject = crypto_cert_subject(cert->px509);
@@ -1214,19 +1274,23 @@ int tls_verify_certificate(rdpTls* tls, CryptoCert cert, char* hostname, int por
 							alt_names_count);
 
 			if (instance->VerifyCertificate)
-			{
-				accept_certificate = instance->VerifyCertificate(instance, subject, issuer, fingerprint);
-			}
+				accept_certificate = instance->VerifyCertificate(instance, common_name,
+																				 subject, issuer, fingerprint, !hostname_match);
 
-			if (!accept_certificate)
+			switch(accept_certificate)
 			{
-				/* user did not accept, abort and do not add entry in known_hosts file */
-				verification_status = FALSE; /* failure! */
-			}
-			else
-			{
-				/* user accepted certificate, add entry in known_hosts file */
-				verification_status = certificate_data_print(tls->certificate_store, certificate_data);
+				case 1:
+					/* user accepted certificate, add entry in known_hosts file */
+					verification_status = certificate_data_print(tls->certificate_store, certificate_data);
+					break;
+				case 2:
+					/* user did accept temporaty, do not add to known hosts file */
+					verification_status = TRUE;
+					break;
+				default:
+					/* user did not accept, abort and do not add entry in known_hosts file */
+					verification_status = FALSE; /* failure! */
+					break;
 			}
 		}
 		else if (match == -1)
@@ -1248,28 +1312,31 @@ int tls_verify_certificate(rdpTls* tls, CryptoCert cert, char* hostname, int por
 			if (instance->VerifyChangedCertificate)
 			{
 				accept_certificate = instance->VerifyChangedCertificate(
-							     instance, subject, issuer,
+							     instance, common_name, subject, issuer,
 							     fingerprint, old_subject, old_issuer,
 							     old_fingerprint);
 			}
 
 			free(old_fingerprint);
 
-			if (!accept_certificate)
+			switch(accept_certificate)
 			{
-				/* user did not accept, abort and do not change known_hosts file */
-				verification_status = FALSE;  /* failure! */
-			}
-			else
-			{
-				/* user accepted new certificate, add replace fingerprint for this host in known_hosts file */
-				verification_status = certificate_data_replace(tls->certificate_store, certificate_data);
+				case 1:
+					/* user accepted certificate, add entry in known_hosts file */
+					verification_status = certificate_data_replace(tls->certificate_store, certificate_data);
+					break;
+				case 2:
+					/* user did accept temporaty, do not add to known hosts file */
+					verification_status = TRUE;
+					break;
+				default:
+					/* user did not accept, abort and do not add entry in known_hosts file */
+					verification_status = FALSE; /* failure! */
+					break;
 			}
 		}
 		else if (match == 0)
-		{
 			verification_status = TRUE; /* success! */
-		}
 
 		free(issuer);
 		free(subject);
@@ -1278,9 +1345,7 @@ int tls_verify_certificate(rdpTls* tls, CryptoCert cert, char* hostname, int por
 
 	certificate_data_free(certificate_data);
 
-#ifndef _WIN32
 	free(common_name);
-#endif
 
 	if (alt_names)
 		crypto_cert_subject_alt_name_free(alt_names_count, alt_names_lengths,

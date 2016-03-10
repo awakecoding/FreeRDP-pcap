@@ -295,6 +295,7 @@ rdpSettings* freerdp_settings_new(DWORD flags)
 	if (!settings->ChannelDefArray)
 			goto out_fail;
 
+	settings->SupportMonitorLayoutPdu = TRUE;
 	settings->MonitorCount = 0;
 	settings->MonitorDefArraySize = 32;
 	settings->MonitorDefArray = (rdpMonitor*) calloc(settings->MonitorDefArraySize, sizeof(rdpMonitor));
@@ -471,7 +472,7 @@ rdpSettings* freerdp_settings_new(DWORD flags)
 	if (!settings->ServerAutoReconnectCookie)
 			goto out_fail;
 
-	settings->ClientTimeZone = (TIME_ZONE_INFO*) calloc(1,sizeof(TIME_ZONE_INFO));
+	settings->ClientTimeZone = (LPTIME_ZONE_INFORMATION) calloc(1,sizeof(TIME_ZONE_INFORMATION));
 	if (!settings->ClientTimeZone)
 			goto out_fail;
 
@@ -597,6 +598,9 @@ rdpSettings* freerdp_settings_clone(rdpSettings* settings)
 		CHECKED_STRDUP(CertificateFile); /* 1410 */
 		CHECKED_STRDUP(PrivateKeyFile); /* 1411 */
 		CHECKED_STRDUP(RdpKeyFile); /* 1412 */
+		CHECKED_STRDUP(CertificateContent); /* 1416 */
+		CHECKED_STRDUP(PrivateKeyContent); /* 1417 */
+		CHECKED_STRDUP(RdpKeyContent); /* 1418 */
 		CHECKED_STRDUP(WindowTitle); /* 1542 */
 		CHECKED_STRDUP(WmClass); /* 1549 */
 		CHECKED_STRDUP(ComputerName); /* 1664 */
@@ -728,14 +732,12 @@ rdpSettings* freerdp_settings_clone(rdpSettings* settings)
 		CopyMemory(_settings->ReceivedCapabilities, settings->ReceivedCapabilities, 32);
 		CopyMemory(_settings->OrderSupport, settings->OrderSupport, 32);
 
-		_settings->ClientHostname = malloc(32);
+		_settings->ClientHostname = _strdup(settings->ClientHostname);
 		if (!_settings->ClientHostname)
 			goto out_fail;
-		_settings->ClientProductId = malloc(32);
+		_settings->ClientProductId = _strdup(settings->ClientProductId);
 		if (!_settings->ClientProductId)
 			goto out_fail;
-		CopyMemory(_settings->ClientHostname, settings->ClientHostname, 32);
-		CopyMemory(_settings->ClientProductId, settings->ClientProductId, 32);
 
 		_settings->BitmapCacheV2CellInfo = (BITMAP_CACHE_V2_CELL_INFO*) malloc(sizeof(BITMAP_CACHE_V2_CELL_INFO) * 6);
 		if (!_settings->BitmapCacheV2CellInfo)
@@ -760,10 +762,10 @@ rdpSettings* freerdp_settings_clone(rdpSettings* settings)
 		CopyMemory(_settings->ClientAutoReconnectCookie, settings->ClientAutoReconnectCookie, sizeof(ARC_CS_PRIVATE_PACKET));
 		CopyMemory(_settings->ServerAutoReconnectCookie, settings->ServerAutoReconnectCookie, sizeof(ARC_SC_PRIVATE_PACKET));
 
-		_settings->ClientTimeZone = (TIME_ZONE_INFO*) malloc(sizeof(TIME_ZONE_INFO));
+		_settings->ClientTimeZone = (LPTIME_ZONE_INFORMATION) malloc(sizeof(TIME_ZONE_INFORMATION));
 		if (!_settings->ClientTimeZone)
 			goto out_fail;
-		CopyMemory(_settings->ClientTimeZone, settings->ClientTimeZone, sizeof(TIME_ZONE_INFO));
+		CopyMemory(_settings->ClientTimeZone, settings->ClientTimeZone, sizeof(TIME_ZONE_INFORMATION));
 
 		_settings->TargetNetAddressCount = settings->TargetNetAddressCount;
 
@@ -813,7 +815,7 @@ rdpSettings* freerdp_settings_clone(rdpSettings* settings)
 			goto out_fail;
 		}
 
- 		if (_settings->DeviceArraySize < _settings->DeviceCount)
+		if (_settings->DeviceArraySize < _settings->DeviceCount)
 		{
 			_settings->DeviceCount = 0;
 			_settings->DeviceArraySize = 0;
@@ -924,6 +926,9 @@ void freerdp_settings_free(rdpSettings* settings)
     free(settings->ServerCertificate);
     free(settings->RdpKeyFile);
     certificate_free(settings->RdpServerCertificate);
+    free(settings->CertificateContent);
+    free(settings->PrivateKeyContent);
+    free(settings->RdpKeyContent);
     free(settings->ClientAutoReconnectCookie);
     free(settings->ServerAutoReconnectCookie);
     free(settings->ClientTimeZone);

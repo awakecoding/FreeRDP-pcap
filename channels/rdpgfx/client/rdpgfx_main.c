@@ -1521,6 +1521,8 @@ void* rdpgfx_get_cache_slot_data(RdpgfxClientContext* context, UINT16 cacheSlot)
 
 #ifdef STATIC_CHANNELS
 #define DVCPluginEntry		rdpgfx_DVCPluginEntry
+#else
+#define DVCPluginEntry		FREERDP_API DVCPluginEntry
 #endif
 
 /**

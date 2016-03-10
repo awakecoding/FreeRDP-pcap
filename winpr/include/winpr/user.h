@@ -23,6 +23,7 @@
 
 #include <winpr/winpr.h>
 #include <winpr/wtypes.h>
+#include <winpr/platform.h>
 
 /**
  * Standard Clipboard Formats
@@ -50,6 +51,7 @@
 #define IDTIMEOUT				32000
 #define IDASYNC					32001
 
+#define CF_RAW			0
 #define CF_TEXT			1
 #define CF_BITMAP		2
 #define CF_METAFILEPICT		3
@@ -102,7 +104,7 @@
  * Bitmap Definitions
  */
 
-#ifndef _WIN32
+#if !defined(_WIN32)
 
 #pragma pack(push, 1)
 
@@ -165,15 +167,6 @@ typedef RGBQUAD FAR* LPRGBQUAD;
 #define PROFILE_LINKED          'LINK'
 #define PROFILE_EMBEDDED        'MBED'
 
-typedef struct tagBITMAPCOREHEADER
-{
-	DWORD bcSize;
-	WORD bcWidth;
-	WORD bcHeight;
-	WORD bcPlanes;
-	WORD bcBitCount;
-} BITMAPCOREHEADER, FAR *LPBITMAPCOREHEADER, *PBITMAPCOREHEADER;
-
 typedef struct tagBITMAPINFOHEADER
 {
 	DWORD biSize;
@@ -188,6 +181,39 @@ typedef struct tagBITMAPINFOHEADER
 	DWORD biClrUsed;
 	DWORD biClrImportant;
 } BITMAPINFOHEADER, FAR *LPBITMAPINFOHEADER, *PBITMAPINFOHEADER;
+
+typedef struct tagBITMAPINFO
+{
+	BITMAPINFOHEADER bmiHeader;
+	RGBQUAD bmiColors[1];
+} BITMAPINFO, FAR *LPBITMAPINFO, *PBITMAPINFO;
+
+typedef enum _ORIENTATION_PREFERENCE
+{
+	ORIENTATION_PREFERENCE_NONE = 0x0,
+	ORIENTATION_PREFERENCE_LANDSCAPE = 0x1,
+
+	ORIENTATION_PREFERENCE_PORTRAIT	= 0x2,
+	ORIENTATION_PREFERENCE_LANDSCAPE_FLIPPED = 0x4,
+	ORIENTATION_PREFERENCE_PORTRAIT_FLIPPED = 0x8
+} ORIENTATION_PREFERENCE;
+
+#pragma pack(pop)
+
+#endif
+
+#if !defined(_WIN32) || defined(_UWP)
+
+#pragma pack(push, 1)
+
+typedef struct tagBITMAPCOREHEADER
+{
+	DWORD bcSize;
+	WORD bcWidth;
+	WORD bcHeight;
+	WORD bcPlanes;
+	WORD bcBitCount;
+} BITMAPCOREHEADER, FAR *LPBITMAPCOREHEADER, *PBITMAPCOREHEADER;
 
 typedef struct
 {
@@ -241,12 +267,6 @@ typedef struct
 	DWORD bV5Reserved;
 } BITMAPV5HEADER, FAR *LPBITMAPV5HEADER, *PBITMAPV5HEADER;
 
-typedef struct tagBITMAPINFO
-{
-	BITMAPINFOHEADER bmiHeader;
-	RGBQUAD bmiColors[1];
-} BITMAPINFO, FAR *LPBITMAPINFO, *PBITMAPINFO;
-
 typedef struct tagBITMAPCOREINFO
 {
 	BITMAPCOREHEADER bmciHeader;
@@ -261,16 +281,6 @@ typedef struct tagBITMAPFILEHEADER
 	WORD bfReserved2;
 	DWORD bfOffBits;
 } BITMAPFILEHEADER, FAR *LPBITMAPFILEHEADER, *PBITMAPFILEHEADER;
-
-typedef enum _ORIENTATION_PREFERENCE
-{
-	ORIENTATION_PREFERENCE_NONE = 0x0,
-	ORIENTATION_PREFERENCE_LANDSCAPE = 0x1,
-
-	ORIENTATION_PREFERENCE_PORTRAIT	= 0x2,
-	ORIENTATION_PREFERENCE_LANDSCAPE_FLIPPED = 0x4,
-	ORIENTATION_PREFERENCE_PORTRAIT_FLIPPED = 0x8
-} ORIENTATION_PREFERENCE;
 
 #pragma pack(pop)
 

@@ -4,8 +4,6 @@
 /* Include files */
 #cmakedefine HAVE_FCNTL_H
 #cmakedefine HAVE_UNISTD_H
-#cmakedefine HAVE_STDINT_H
-#cmakedefine HAVE_STDBOOL_H
 #cmakedefine HAVE_INTTYPES_H
 #cmakedefine HAVE_SYS_MODEM_H
 #cmakedefine HAVE_SYS_FILIO_H
@@ -89,6 +87,5 @@
 #cmakedefine WITH_DEBUG_X11_CLIPRDR
 #cmakedefine WITH_DEBUG_X11_LOCAL_MOVESIZE
 #cmakedefine WITH_DEBUG_XV
-#cmakedefine WITH_DEBUG_ANDROID_JNI
 #cmakedefine WITH_DEBUG_RINGBUFFER
 #endif

@@ -29,6 +29,7 @@
 #include <string.h>
 
 #include <winpr/crt.h>
+#include <winpr/crypto.h>
 
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
@@ -398,18 +399,17 @@ static BOOL certificate_process_server_public_signature(rdpCertificate* certific
 		const BYTE* sigdata, int sigdatalen, wStream* s, UINT32 siglen)
 {
 	int i, sum;
-	CryptoMd5 md5ctx;
+	WINPR_MD5_CTX md5ctx;
 	BYTE sig[TSSK_KEY_LENGTH];
 	BYTE encsig[TSSK_KEY_LENGTH + 8];
-	BYTE md5hash[CRYPTO_MD5_DIGEST_LENGTH];
+	BYTE md5hash[WINPR_MD5_DIGEST_LENGTH];
 
-	md5ctx = crypto_md5_init();
-
-	if (!md5ctx)
-		return FALSE;
-
-	crypto_md5_update(md5ctx, sigdata, sigdatalen);
-	crypto_md5_final(md5ctx, md5hash);
+	if (!winpr_MD5_Init(&md5ctx))
+            return FALSE;
+	if (!winpr_MD5_Update(&md5ctx, sigdata, sigdatalen))
+            return FALSE;
+	if (!winpr_MD5_Final(&md5ctx, md5hash, sizeof(md5hash)))
+            return FALSE;
 	Stream_Read(s, encsig, siglen);
 
 	/* Last 8 bytes shall be all zero. */
@@ -662,54 +662,22 @@ BOOL certificate_read_server_certificate(rdpCertificate* certificate, BYTE* serv
 	return ret;
 }
 
-rdpRsaKey* key_new(const char* keyfile)
+rdpRsaKey* key_new_from_content(const char *keycontent, const char *keyfile)
 {
 	BIO* bio = NULL;
-	FILE* fp = NULL;
 	RSA* rsa = NULL;
-	int length;
-	BYTE* buffer = NULL;
 	rdpRsaKey* key = NULL;
 
 	key = (rdpRsaKey*) calloc(1, sizeof(rdpRsaKey));
-
 	if (!key)
 		return NULL;
 
-	fp = fopen(keyfile, "r+b");
-
-	if (!fp)
-	{
-		WLog_ERR(TAG, "unable to open RSA key file %s: %s.", keyfile, strerror(errno));
-		goto out_free;
-	}
-
-	if (fseek(fp, 0, SEEK_END) < 0)
-		goto out_free;
-	if ((length = ftell(fp)) < 0)
-		goto out_free;
-	if (fseek(fp, 0, SEEK_SET) < 0)
-		goto out_free;
-
-	buffer = (BYTE*) malloc(length);
-
-	if (!buffer)
-		goto out_free;
-
-	if (fread((void*) buffer, length, 1, fp) != 1)
-		goto out_free;
-	fclose(fp);
-	fp = NULL;
-
-	bio = BIO_new_mem_buf((void*) buffer, length);
-
+	bio = BIO_new_mem_buf((void *)keycontent, strlen(keycontent));
 	if (!bio)
 		goto out_free;
 
 	rsa = PEM_read_bio_RSAPrivateKey(bio, NULL, NULL, NULL);
 	BIO_free(bio);
-	free(buffer);
-	buffer = NULL;
 
 	if (!rsa)
 	{
@@ -765,10 +733,49 @@ out_free_modulus:
 out_free_rsa:
 	RSA_free(rsa);
 out_free:
+	free(key);
+	return NULL;
+}
+
+
+rdpRsaKey* key_new(const char* keyfile)
+{
+	FILE* fp = NULL;
+	int length;
+	char* buffer = NULL;
+	rdpRsaKey* key = NULL;
+
+	fp = fopen(keyfile, "r+b");
+	if (!fp)
+	{
+		WLog_ERR(TAG, "unable to open RSA key file %s: %s.", keyfile, strerror(errno));
+		goto out_free;
+	}
+
+	if (fseek(fp, 0, SEEK_END) < 0)
+		goto out_free;
+	if ((length = ftell(fp)) < 0)
+		goto out_free;
+	if (fseek(fp, 0, SEEK_SET) < 0)
+		goto out_free;
+
+	buffer = (char *)malloc(length + 1);
+	if (!buffer)
+		goto out_free;
+
+	if (fread((void*) buffer, length, 1, fp) != 1)
+		goto out_free;
+	fclose(fp);
+	buffer[length] = '\0';
+
+	key = key_new_from_content(buffer, keyfile);
+	free(buffer);
+	return key;
+
+out_free:
 	if (fp)
 		fclose(fp);
 	free(buffer);
-	free(key);
 	return NULL;
 }
 
