@@ -398,6 +398,15 @@ static int fastpath_recv_update_data(rdpFastPath* fastpath, wStream* s)
 	cs = s;
 	next_pos = Stream_GetPosition(s) + size;
 
+	if (rdp->settings->ReplayMode)
+	{
+		if (compressionFlags && (fragmentation == FASTPATH_FRAGMENT_SINGLE))
+		{
+			Stream_SetPosition(s, next_pos);
+			return 1; /* ignore problematic compressed packets in replay mode */
+		}
+	}
+
 	bulkStatus = bulk_decompress(rdp->bulk, Stream_Pointer(s), size, &pDstData, &DstSize, compressionFlags);
 
 	if (bulkStatus < 0)

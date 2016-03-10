@@ -972,6 +972,9 @@ BOOL freerdp_get_param_bool(rdpSettings* settings, int id)
 		case FreeRDP_ExternalSecurity:
 			return settings->ExternalSecurity;
 
+		case FreeRDP_ReplayMode:
+			return settings->ReplayMode;
+
 		case FreeRDP_GatewayUseSameCredentials:
 			return settings->GatewayUseSameCredentials;
 
@@ -1444,6 +1447,10 @@ int freerdp_set_param_bool(rdpSettings* settings, int id, BOOL param)
 
 		case FreeRDP_ExternalSecurity:
 			settings->ExternalSecurity = param;
+			break;
+
+		case FreeRDP_ReplayMode:
+			settings->ReplayMode = param;
 			break;
 
 		case FreeRDP_GatewayUseSameCredentials:

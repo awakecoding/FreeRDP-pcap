@@ -1254,7 +1254,7 @@ static int rdp_recv_fastpath_pdu(rdpRdp* rdp, wStream* s)
 		if (!rdp_decrypt(rdp, s, length, flags))
 		{
 			WLog_ERR(TAG, "rdp_recv_fastpath_pdu: rdp_decrypt() fail");
-			return -1;
+			return (rdp->settings->ReplayMode) ? 1 : -1;
 		}
 	}
 

@@ -153,19 +153,18 @@ BOOL pf_pre_connect(freerdp* instance)
 	settings->RemoteFxCodec = TRUE;
 	settings->SurfaceFrameMarkerEnabled = TRUE;
 	settings->FrameMarkerCommandEnabled = TRUE;
+	settings->AutoReconnectionEnabled = FALSE;
+	settings->NetworkAutoDetect = TRUE;
 
+	settings->ReplayMode = TRUE;
 	settings->ExternalTransport = TRUE;
 	settings->ExternalSecurity = TRUE;
 	settings->CompressionEnabled = FALSE;
 	settings->IgnoreCertificate = TRUE;
 	settings->ExternalCertificateManagement = TRUE;
 
+	settings->SupportDynamicChannels = FALSE;
 	settings->SupportGraphicsPipeline = TRUE;
-
-	context->cache = cache_new(settings);
-
-	if (!context->cache)
-		return FALSE;
 
 	PubSub_SubscribeChannelConnected(context->pubSub,
 		(pChannelConnectedEventHandler) pf_OnChannelConnectedEventHandler);
@@ -202,7 +201,7 @@ BOOL pf_post_connect(freerdp* instance)
 
 void pf_post_disconnect(freerdp* instance)
 {
-	//gdi_free(instance);
+
 }
 
 static BOOL pf_authenticate(freerdp* instance, char** username, char** password, char** domain)

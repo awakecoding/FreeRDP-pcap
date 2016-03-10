@@ -366,7 +366,7 @@ int freerdp_packet_server_recv_channel_data(freerdp* instance, UINT16 channelId,
 	if (!channel)
 		return 1;
 
-	if (!strcmp(channel->Name, "drdynvc"))
+	if (!strcmp(channel->Name, "drdynvc") && 0)
 	{
 		UINT error;
 
