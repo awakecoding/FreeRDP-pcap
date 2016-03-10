@@ -13,7 +13,11 @@ set(${MODULE_PREFIX}_LIBS ${${MODULE_PREFIX}_LIBS} pfreerdp-client)
 
 target_link_libraries(${MODULE_NAME} ${${MODULE_PREFIX}_LIBS})
 
-set_target_properties(${MODULE_NAME} PROPERTIES OUTPUT_NAME "pfreerdp" RUNTIME_OUTPUT_DIRECTORY "..")
+set_target_properties(${MODULE_NAME} PROPERTIES OUTPUT_NAME "pfreerdp")
+
+if(NOT WIN32)
+	set_target_properties(${MODULE_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "..")
+endif()
 
 install(TARGETS ${MODULE_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT client)
 

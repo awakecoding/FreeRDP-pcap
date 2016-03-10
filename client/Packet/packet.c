@@ -42,7 +42,9 @@
 
 void pf_OnChannelConnectedEventHandler(rdpContext* context, ChannelConnectedEventArgs* e)
 {
-	if (strcmp(e->name, RDPGFX_DVC_CHANNEL_NAME) == 0)
+	WLog_WARN(TAG, "OnChannelConnectedEventHandler: %s", e->name);
+
+	if (!strcmp(e->name, RDPGFX_DVC_CHANNEL_NAME))
 	{
 		gdi_graphics_pipeline_init(context->gdi, (RdpgfxClientContext*) e->pInterface);
 	}
@@ -50,7 +52,9 @@ void pf_OnChannelConnectedEventHandler(rdpContext* context, ChannelConnectedEven
 
 void pf_OnChannelDisconnectedEventHandler(rdpContext* context, ChannelDisconnectedEventArgs* e)
 {
-	if (strcmp(e->name, RDPGFX_DVC_CHANNEL_NAME) == 0)
+	WLog_WARN(TAG, "OnChannelDisconnectedEventHandler: %s", e->name);
+
+	if (!strcmp(e->name, RDPGFX_DVC_CHANNEL_NAME))
 	{
 		gdi_graphics_pipeline_uninit(context->gdi, (RdpgfxClientContext*) e->pInterface);
 	}
@@ -98,11 +102,10 @@ BOOL pf_end_paint(pfContext* pfc)
 
 BOOL pf_desktop_resize(pfContext* pfc)
 {
-	freerdp* instance = pfc->instance;
+	rdpContext* context = (rdpContext*) pfc;
+	rdpSettings* settings = context->settings;
 
-	gdi_free(instance);
-
-	if (!gdi_init(instance, CLRCONV_ALPHA | CLRBUF_32BPP, NULL))
+	if (!gdi_resize(context->gdi, settings->DesktopWidth, settings->DesktopHeight))
 		return FALSE;
 
 	return TRUE;
@@ -155,13 +158,9 @@ BOOL pf_pre_connect(freerdp* instance)
 	settings->ExternalSecurity = TRUE;
 	settings->CompressionEnabled = FALSE;
 	settings->IgnoreCertificate = TRUE;
+	settings->ExternalCertificateManagement = TRUE;
 
-	//settings->RdpSecurity = TRUE;
-	//settings->TlsSecurity = TRUE;
-	//settings->NlaSecurity = FALSE;
-	//settings->NegotiateSecurityLayer = FALSE;
-
-	settings->SupportGraphicsPipeline = FALSE;
+	settings->SupportGraphicsPipeline = TRUE;
 
 	context->cache = cache_new(settings);
 
@@ -203,7 +202,7 @@ BOOL pf_post_connect(freerdp* instance)
 
 void pf_post_disconnect(freerdp* instance)
 {
-	gdi_free(instance);
+	//gdi_free(instance);
 }
 
 static BOOL pf_authenticate(freerdp* instance, char** username, char** password, char** domain)
@@ -216,9 +215,9 @@ static BOOL pf_gw_authenticate(freerdp* instance, char** username, char** passwo
 	return TRUE;
 }
 
-BOOL pf_verify_certificate(freerdp* instance, char* subject, char* issuer, char* fingerprint)
+int pf_verify_x509_certificate(freerdp* instance, BYTE* data, int length, const char* hostname, int port, DWORD flags)
 {
-	return TRUE;
+	return 1;
 }
 
 int pf_logon_error_info(freerdp* instance, UINT32 data, UINT32 type)
@@ -292,7 +291,7 @@ BOOL pfreerdp_client_new(freerdp* instance, rdpContext* context)
 	instance->PostDisconnect = pf_post_disconnect;
 	instance->Authenticate = pf_authenticate;
 	instance->GatewayAuthenticate = pf_gw_authenticate;
-	instance->VerifyCertificate = pf_verify_certificate;
+	instance->VerifyX509Certificate = pf_verify_x509_certificate;
 	instance->LogonErrorInfo = pf_logon_error_info;
 
 	pfc->instance = instance;
