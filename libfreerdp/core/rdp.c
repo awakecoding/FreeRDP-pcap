@@ -1251,10 +1251,17 @@ static int rdp_recv_fastpath_pdu(rdpRdp* rdp, wStream* s)
 	{
 		UINT16 flags = (fastpath->encryptionFlags & FASTPATH_OUTPUT_SECURE_CHECKSUM) ? SEC_SECURE_CHECKSUM : 0;
 
+		if (rdp->settings->ReplayMode)
+		{
+			WLog_WARN(TAG, "ignoring encrypted fastpath packet (%d bytes)", length);
+			Stream_Seek(s, length);
+			return 0;
+		}
+
 		if (!rdp_decrypt(rdp, s, length, flags))
 		{
 			WLog_ERR(TAG, "rdp_recv_fastpath_pdu: rdp_decrypt() fail");
-			return (rdp->settings->ReplayMode) ? 1 : -1;
+			return -1;
 		}
 	}
 

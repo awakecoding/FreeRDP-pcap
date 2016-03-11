@@ -154,7 +154,8 @@ BOOL pf_pre_connect(freerdp* instance)
 	settings->SurfaceFrameMarkerEnabled = TRUE;
 	settings->FrameMarkerCommandEnabled = TRUE;
 	settings->AutoReconnectionEnabled = FALSE;
-	settings->NetworkAutoDetect = TRUE;
+	settings->NetworkAutoDetect = FALSE;
+	settings->SupportHeartbeatPdu = FALSE;
 
 	settings->ReplayMode = TRUE;
 	settings->ExternalTransport = TRUE;
@@ -163,6 +164,7 @@ BOOL pf_pre_connect(freerdp* instance)
 	settings->IgnoreCertificate = TRUE;
 	settings->ExternalCertificateManagement = TRUE;
 
+	settings->DeviceRedirection = FALSE;
 	settings->SupportDynamicChannels = FALSE;
 	settings->SupportGraphicsPipeline = TRUE;
 

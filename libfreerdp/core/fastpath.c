@@ -391,7 +391,8 @@ static int fastpath_recv_update_data(rdpFastPath* fastpath, wStream* s)
 
 	if (Stream_GetRemainingLength(s) < size)
 	{
-		WLog_ERR(TAG, "Stream_GetRemainingLength() < size");
+		WLog_ERR(TAG, "insufficient fastpath data: actual: %d expected: %d",
+			Stream_GetRemainingLength(s), size);
 		return -1;
 	}
 
@@ -402,6 +403,7 @@ static int fastpath_recv_update_data(rdpFastPath* fastpath, wStream* s)
 	{
 		if (compressionFlags && (fragmentation == FASTPATH_FRAGMENT_SINGLE))
 		{
+			WLog_WARN(TAG, "ignoring compressed fastpath packet (%d bytes)", size);
 			Stream_SetPosition(s, next_pos);
 			return 1; /* ignore problematic compressed packets in replay mode */
 		}

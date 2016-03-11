@@ -171,7 +171,42 @@ BOOL gdi_Bitmap_Decompress(rdpContext* context, rdpBitmap* bitmap,
 
 	if (compressed)
 	{
-		if (bpp < 32)
+		if (codecId == RDP_CODEC_ID_REMOTEFX)
+		{
+			RFX_MESSAGE* message;
+
+			if (!freerdp_client_codecs_prepare(context->codecs, FREERDP_CODEC_REMOTEFX))
+				return FALSE;
+
+			message = rfx_process_message(context->codecs->rfx, pSrcData, SrcSize);
+
+			if (!message)
+			{
+				WLog_ERR(TAG, "rfx_process_message failure");
+				return FALSE;
+			}
+
+			rfx_message_free(context->codecs->rfx, message);
+
+			status = 1;
+		}
+		else if (codecId == RDP_CODEC_ID_NSCODEC)
+		{
+			if (!freerdp_client_codecs_prepare(context->codecs, FREERDP_CODEC_NSCODEC))
+				return FALSE;
+
+			status = nsc_process_message(context->codecs->nsc, 32, width, height, pSrcData, SrcSize);
+
+			if (status < 1)
+			{
+				WLog_ERR(TAG, "nsc_process_message failure");
+				return FALSE;
+			}
+
+			status = freerdp_image_copy(pDstData, gdi->format, -1, 0, 0,
+				width, height, context->codecs->nsc->BitmapData, PIXEL_FORMAT_XRGB32, -1, 0, 0, gdi->palette);
+		}
+		else if (bpp < 32)
 		{
 			if (!freerdp_client_codecs_prepare(gdi->codecs, FREERDP_CODEC_INTERLEAVED))
 				return FALSE;

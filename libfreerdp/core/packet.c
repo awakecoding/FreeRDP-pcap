@@ -455,7 +455,15 @@ int freerdp_packet_client_to_server(rdpContext* context, wStream* s, UINT32 time
 
 		mcs_recv_connect_initial(mcs, s);
 
+		settings->NetworkAutoDetect = FALSE;
+		settings->SupportHeartbeatPdu = FALSE;
+		settings->SupportMultitransport = FALSE;
+
 		settings->ChannelCount = mcs->channelCount;
+
+		settings->DeviceRedirection = FALSE;
+		settings->EncomspVirtualChannel = FALSE;
+		settings->RemdeskVirtualChannel = FALSE;
 
 		settings->DynamicChannelCount = 0;
 		settings->SupportDynamicChannels = FALSE;
@@ -476,6 +484,8 @@ int freerdp_packet_client_to_server(rdpContext* context, wStream* s, UINT32 time
 				settings->EncomspVirtualChannel = TRUE;
 			else if (!strcmp(name, "remdesk"))
 				settings->RemdeskVirtualChannel = TRUE;
+			else if (!strcmp(name, "rdpdr"))
+				settings->DeviceRedirection = TRUE;
 		}
 
 		mcs_initialize_client_channels(mcs, settings);
