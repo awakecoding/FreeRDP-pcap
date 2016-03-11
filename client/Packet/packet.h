@@ -13,6 +13,11 @@ typedef struct pf_context pfContext;
 extern "C" {
 #endif
 
+typedef int (*fnReplayFrame)(pfContext* pfc,
+	BYTE* frameData, int frameStep, int frameWidth, int frameHeight,
+	int changeX, int changeY, int changeWidth, int changeHeight,
+	UINT64 frameTime, int frameIndex);
+
 struct pf_context
 {
 	rdpContext context;
@@ -22,6 +27,8 @@ struct pf_context
 	HANDLE stopEvent;
 	freerdp* instance;
 	rdpSettings* settings;
+
+	fnReplayFrame ReplayFrame;
 };
 
 /**

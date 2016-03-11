@@ -499,6 +499,9 @@ int freerdp_packet_client_to_server(rdpContext* context, wStream* s, UINT32 time
 			settings->SupportGraphicsPipeline = FALSE;
 			settings->RemoteFxCodec = TRUE;
 		}
+
+		if (settings->EncomspVirtualChannel && settings->RemdeskVirtualChannel)
+			settings->LyncRdpMode = TRUE;
 	}
 	else if (rdp->state == CONNECTION_STATE_ACTIVE)
 	{

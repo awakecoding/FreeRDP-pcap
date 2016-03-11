@@ -365,8 +365,8 @@ INLINE BYTE* gdi_get_bitmap_pointer(HGDI_DC hdcBmp, int x, int y)
 	}
 	else
 	{
-		WLog_ERR(TAG,  "gdi_get_bitmap_pointer: requesting invalid pointer: (%d,%d) in %dx%d",
-			x, y, hBmp->width, hBmp->height);
+		//WLog_ERR(TAG,  "gdi_get_bitmap_pointer: requesting invalid pointer: (%d,%d) in %dx%d",
+		//	x, y, hBmp->width, hBmp->height);
 		return 0;
 	}
 }

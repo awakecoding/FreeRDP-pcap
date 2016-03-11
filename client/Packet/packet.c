@@ -70,10 +70,8 @@ BOOL pf_begin_paint(pfContext* pfc)
 
 BOOL pf_end_paint(pfContext* pfc)
 {
-	wImage img;
 	rdpGdi* gdi;
 	HGDI_RGN invalid;
-	char filename[256];
 	rdpContext* context = (rdpContext*) pfc;
 
 	gdi = context->gdi;
@@ -82,20 +80,13 @@ BOOL pf_end_paint(pfContext* pfc)
 	if (invalid->null)
 		return TRUE;
 
-	WLog_DBG(TAG, "OnPaint: %d %d %d %d", invalid->x, invalid->y, invalid->w, invalid->h);
+	if (pfc->ReplayFrame)
+	{
+		pfc->ReplayFrame(pfc, gdi->primary_buffer, gdi->width * 4, gdi->width, gdi->height,
+			invalid->x, invalid->y, invalid->w, invalid->h, 0, pfc->frameIndex);
+	}
 
-	sprintf_s(filename, sizeof(filename) - 1, "rdp_%04d.bmp", pfc->frameIndex++);
-
-	ZeroMemory(&img, sizeof(wImage));
-	img.type = WINPR_IMAGE_BITMAP;
-	img.width = gdi->width;
-	img.height = gdi->height;
-	img.data = gdi->primary_buffer;
-	img.scanline = gdi->width * 4;
-	img.bitsPerPixel = 32;
-	img.bytesPerPixel = 4;
-	
-	winpr_image_write(&img, filename);
+	pfc->frameIndex++;
 
 	return TRUE;
 }

@@ -225,7 +225,7 @@ BOOL gdi_Bitmap_Decompress(rdpContext* context, rdpBitmap* bitmap,
 
 		if (status < 0)
 		{
-			WLog_ERR(TAG, "Bitmap Decompression Failed");
+			WLog_ERR(TAG, "bitmap decompression failure: bpp: %d codecId: %d", bpp, codecId);
 			return FALSE;
 		}
 	}
