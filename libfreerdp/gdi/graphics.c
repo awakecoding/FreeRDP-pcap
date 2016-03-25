@@ -171,8 +171,10 @@ BOOL gdi_Bitmap_Decompress(rdpContext* context, rdpBitmap* bitmap,
 
 	if (compressed)
 	{
-		if (codecId == RDP_CODEC_ID_REMOTEFX)
+		if ((codecId == RDP_CODEC_ID_REMOTEFX) || (codecId == RDP_CODEC_ID_IMAGE_REMOTEFX))
 		{
+			RFX_TILE* tile;
+			RFX_RECT* rect;
 			RFX_MESSAGE* message;
 
 			if (!freerdp_client_codecs_prepare(context->codecs, FREERDP_CODEC_REMOTEFX))
@@ -184,6 +186,20 @@ BOOL gdi_Bitmap_Decompress(rdpContext* context, rdpBitmap* bitmap,
 			{
 				WLog_ERR(TAG, "rfx_process_message failure");
 				return FALSE;
+			}
+
+			if ((message->numTiles == 1) && (message->numRects == 1) && (width <= 64) && (height <= 64))
+			{
+				tile = message->tiles[0];
+				rect = &message->rects[0];
+
+				freerdp_image_copy(pDstData, PIXEL_FORMAT_XRGB32, width * 4, 0, 0,
+					width, height, tile->data, PIXEL_FORMAT_XRGB32, width * 4, 0, 0, NULL);
+			}
+			else
+			{
+				WLog_WARN(TAG, "RfxMessage: numTiles: %d numRects: %d width: %d height: %d",
+					message->numTiles, message->numRects, width, height);
 			}
 
 			rfx_message_free(context->codecs->rfx, message);

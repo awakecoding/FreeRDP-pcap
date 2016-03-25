@@ -2124,6 +2124,8 @@ BOOL update_write_cache_bitmap_v2_order(wStream* s, CACHE_BITMAP_V2_ORDER* cache
 
 BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_bitmap_v3, UINT16 flags)
 {
+	BYTE reserved1;
+	BYTE reserved2;
 	BYTE bitsPerPixelId;
 	BITMAP_DATA_EX* bitmapData;
 	UINT32 new_len;
@@ -2150,8 +2152,8 @@ BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_
 		WLog_ERR(TAG, "invalid bpp value %d", bitmapData->bpp);
 		return FALSE;
 	}
-	Stream_Seek_UINT8(s); /* reserved1 (1 byte) */
-	Stream_Seek_UINT8(s); /* reserved2 (1 byte) */
+	Stream_Read_UINT8(s, reserved1); /* reserved1 (1 byte) */
+	Stream_Read_UINT8(s, reserved2); /* reserved2 (1 byte) */
 	Stream_Read_UINT8(s, bitmapData->codecID); /* codecID (1 byte) */
 	Stream_Read_UINT16(s, bitmapData->width); /* width (2 bytes) */
 	Stream_Read_UINT16(s, bitmapData->height); /* height (2 bytes) */
@@ -2161,11 +2163,40 @@ BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_
 		return FALSE;
 
 	new_data = (BYTE*) realloc(bitmapData->data, new_len);
+
 	if (!new_data)
 		return FALSE;
+	
 	bitmapData->data = new_data;
 	bitmapData->length = new_len;
-	Stream_Read(s, bitmapData->data, bitmapData->length);
+
+	if (bitmapData->codecID == 5)
+	{
+		/**
+		 * This appears to be a variant of RemoteFX in image mode:
+		 * regular RemoteFX blocks start at 24 bytes inside the buffer,
+		 * yet 16 bytes are missing at the end of tile blocks.
+		 * If we copy the unknown bytes at the end and remove the
+		 * last 8 bytes, we can decode with color artifacts.
+		 */
+
+		if (bitmapData->length >= 24)
+		{
+			Stream_Read(s, &bitmapData->data[bitmapData->length - 24], 24);
+			Stream_Read(s, bitmapData->data, bitmapData->length - 24);
+			bitmapData->length -= 8;
+		}
+		else
+		{
+			Stream_Read(s, bitmapData->data, bitmapData->length);
+		}
+
+		bitmapData->codecID = RDP_CODEC_ID_IMAGE_REMOTEFX;
+	}
+	else
+	{
+		Stream_Read(s, bitmapData->data, bitmapData->length);
+	}
 
 	return TRUE;
 }
