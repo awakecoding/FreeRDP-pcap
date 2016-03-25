@@ -36,7 +36,24 @@
 #include <freerdp/client/cmdline.h>
 #include <freerdp/client/channels.h>
 
-#include "packet.h"
+#include "RdpDecoder.h"
+
+typedef struct pf_context pfContext;
+
+struct pf_context
+{
+	rdpContext context;
+	DEFINE_RDP_CLIENT_COMMON();
+
+	int frameIndex;
+	HANDLE stopEvent;
+	HANDLE finishEvent;
+	freerdp* instance;
+	rdpSettings* settings;
+
+	void* frameParam;
+	fnFrameCallback frameFunc;
+};
 
 #define TAG CLIENT_TAG("packet")
 
@@ -80,9 +97,9 @@ BOOL pf_end_paint(pfContext* pfc)
 	if (invalid->null)
 		return TRUE;
 
-	if (pfc->ReplayFrame)
+	if (pfc->frameFunc)
 	{
-		pfc->ReplayFrame(pfc, gdi->primary_buffer, gdi->width * 4, gdi->width, gdi->height,
+		pfc->frameFunc(pfc->frameParam, gdi->primary_buffer, gdi->width * 4, gdi->width, gdi->height,
 			invalid->x, invalid->y, invalid->w, invalid->h, 0, pfc->frameIndex);
 	}
 
@@ -230,12 +247,6 @@ DWORD WINAPI pf_client_thread(LPVOID lpParam)
 	pfc = (pfContext*) context;
 	instance = context->instance;
 
-	if (!freerdp_connect(instance))
-	{
-		ExitThread(0);
-		return 0;
-	}
-
 	while (1)
 	{
 		nCount = 0;
@@ -254,6 +265,9 @@ DWORD WINAPI pf_client_thread(LPVOID lpParam)
 		if (!freerdp_check_event_handles(context))
 			break;
 	}
+
+	if (pfc->finishEvent)
+		SetEvent(pfc->finishEvent);
 
 	ExitThread(0);
 	return 0;
@@ -325,6 +339,14 @@ int pfreerdp_client_start(rdpContext* context)
 {
 	pfContext* pfc = (pfContext*) context;
 
+	ResetEvent(pfc->stopEvent);
+	
+	if (pfc->finishEvent)
+		ResetEvent(pfc->finishEvent);
+
+	if (!freerdp_connect(context->instance))
+		return -1;
+
 	pfc->thread = CreateThread(NULL, 0, pf_client_thread, (void*) context, 0, NULL);
 
 	if (!pfc->thread)
@@ -364,4 +386,164 @@ int RdpClientEntry(RDP_CLIENT_ENTRY_POINTS* pEntryPoints)
 	pEntryPoints->ClientStop = pfreerdp_client_stop;
 
 	return 0;
+}
+
+/**
+ * C++ Wrapper Class
+ */
+
+bool RdpDecoder::open(const char* filename)
+{
+	int argc;
+	char* argv[4];
+	HANDLE thread;
+	DWORD dwExitCode;
+	pfContext* pfc;
+	rdpContext* context;
+	rdpSettings* settings;
+	RDP_CLIENT_ENTRY_POINTS clientEntryPoints;
+
+	if (filename)
+	{
+		m_filename = _strdup(filename);
+
+		if (!m_filename)
+			return false;
+	}
+
+	if (!m_filename)
+		return false;
+
+	ZeroMemory(&clientEntryPoints, sizeof(RDP_CLIENT_ENTRY_POINTS));
+	clientEntryPoints.Size = sizeof(RDP_CLIENT_ENTRY_POINTS);
+	clientEntryPoints.Version = RDP_CLIENT_INTERFACE_VERSION;
+
+	settings = (rdpSettings*) m_settings;
+	clientEntryPoints.settings = settings;
+
+	RdpClientEntry(&clientEntryPoints);
+
+	context = freerdp_client_context_new(&clientEntryPoints);
+	m_context = (void*) context;
+
+	pfc = (pfContext*) context;
+	settings = context->settings;
+	m_settings = (rdpSettings*) settings;
+
+	freerdp_set_param_string(settings, FreeRDP_ServerHostname, m_filename);
+
+	return true;
+}
+
+bool RdpDecoder::args(int argc, char** argv)
+{
+	int status;
+	const char* filename;
+	rdpContext* context;
+	rdpSettings* settings;
+
+	context = (rdpContext*) m_context;
+	settings = (rdpSettings*) m_settings;
+
+	if (context)
+		settings = context->settings;
+	else
+		settings = freerdp_settings_new(0);
+
+	if (!settings)
+		return false;
+
+	status = freerdp_client_settings_parse_command_line(settings, argc, argv, TRUE);
+
+	if (status < 0)
+		return false;
+
+	filename = freerdp_get_param_string(settings, FreeRDP_ServerHostname);
+
+	m_filename = _strdup(filename);
+
+	return true;
+}
+
+void RdpDecoder::close()
+{
+	if (m_context)
+	{
+		freerdp_client_context_free((rdpContext*) m_context);
+		m_context = NULL;
+	}
+
+	if (m_filename)
+	{
+		free(m_filename);
+		m_filename = NULL;
+	}
+}
+
+void RdpDecoder::setFinishEvent(HANDLE finishEvent)
+{
+	m_finishEvent = finishEvent;
+}
+
+void RdpDecoder::setFrameCallback(fnFrameCallback func, void* param)
+{
+	m_frameFunc = func;
+	m_frameParam = param;
+}
+
+bool RdpDecoder::start()
+{
+	int status;
+	pfContext* pfc;
+	rdpContext* context;
+	
+	context = (rdpContext*) m_context;
+	pfc = (pfContext*) m_context;
+
+	if (!pfc)
+		return false;
+
+	if (!m_frameFunc)
+		return false;
+
+	pfc->frameFunc = m_frameFunc;
+	pfc->frameParam = m_frameParam;
+
+	pfc->finishEvent = m_finishEvent;
+
+	status = freerdp_client_start(context);
+
+	if (status < 0)
+		return false;
+
+	return true;
+}
+
+bool RdpDecoder::stop()
+{
+	int status;
+	pfContext* pfc;
+	rdpContext* context;
+
+	context = (rdpContext*) m_context;
+	pfc = (pfContext*) m_context;
+
+	status = freerdp_client_stop(context);
+
+	if (status < 0)
+		return false;
+
+	return true;
+}
+
+RdpDecoder::RdpDecoder():
+	m_context(NULL), m_settings(NULL), m_filename(NULL),
+	m_frameParam(NULL), m_frameFunc(NULL), m_finishEvent(NULL)
+{
+
+}
+
+RdpDecoder::~RdpDecoder()
+{
+	close();
 }

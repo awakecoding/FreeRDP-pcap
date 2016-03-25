@@ -3,10 +3,10 @@ set(MODULE_NAME "pfreerdp-client")
 set(MODULE_PREFIX "FREERDP_CLIENT_PACKET")
 
 set(${MODULE_PREFIX}_SRCS
-	packet.c
-	packet.h)
+	RdpDecoder.cpp
+	RdpDecoder.h)
 
-add_library(${MODULE_NAME} ${${MODULE_PREFIX}_SRCS})
+add_library(${MODULE_NAME} SHARED ${${MODULE_PREFIX}_SRCS})
 
 if(WITH_LIBRARY_VERSIONING)
 	set_target_properties(${MODULE_NAME} PROPERTIES VERSION ${FREERDP_VERSION} SOVERSION ${FREERDP_API_VERSION})
