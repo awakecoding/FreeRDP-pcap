@@ -55,6 +55,9 @@ struct _WINPR_BIO_PCAP
 	rdpIPv4Header ipv4;
 	rdpTcpHeader tcp;
 	wStream* cs;
+	BOOL firstPass;
+	BOOL mcsDone;
+	wStream* mcsPkt;
 };
 typedef struct _WINPR_BIO_PCAP WINPR_BIO_PCAP;
 
@@ -263,7 +266,7 @@ UINT freerdp_packet_server_recv_drdynvc_data(rdpContext* context, BYTE* data, UI
 			{
 				channelId = drdynvc_read_variable_uint(drdynvc->staticData, cbChId);
 
-				dataSize = Stream_GetRemainingLength(drdynvc->staticData);
+				dataSize = (UINT32) Stream_GetRemainingLength(drdynvc->staticData);
 
 				if (cmd == DATA_FIRST_PDU)
 				{
@@ -441,19 +444,60 @@ BOOL freerdp_packet_read_header(wStream* s, UINT16* length, UINT16* channelId)
 	return TRUE;
 }
 
-int freerdp_packet_client_to_server(rdpContext* context, wStream* s, UINT32 timestamp)
+int freerdp_packet_client_to_server(BIO* bio, rdpContext* context, wStream* s, UINT32 timestamp)
 {
+	size_t pos;
 	UINT32 index;
 	rdpRdp* rdp = context->rdp;
 	rdpMcs* mcs = rdp->mcs;
+	BOOL tpktDataPdu = FALSE;
 	rdpSettings* settings = context->settings;
+	WINPR_BIO_PCAP* ptr = (WINPR_BIO_PCAP*) bio->ptr;
 
-	if (rdp->state == CONNECTION_STATE_MCS_CONNECT)
+	if (!ptr->firstPass)
+	{
+		UINT16 li;
+		int length;
+
+		pos = Stream_GetPosition(s);
+
+		if (tpkt_read_header(s) && tpdu_read_data(s, &li) &&
+			ber_read_application_tag(s, MCS_TYPE_CONNECT_INITIAL, &length))
+		{
+			Stream_SetPosition(s, pos);
+			ptr->mcsPkt = Stream_New(NULL, Stream_GetRemainingLength(s));
+			Stream_Copy(s, ptr->mcsPkt, Stream_GetRemainingLength(s));
+			Stream_SetPosition(ptr->mcsPkt, 0);
+		}
+
+		Stream_SetPosition(s, pos);
+
+		if (ptr->mcsPkt)
+			ptr->firstPass = TRUE;
+
+		return 1;
+	}
+	else
+	{
+		UINT16 length;
+		UINT16 channelId = 0;
+
+		pos = Stream_GetPosition(s);
+
+		if (freerdp_packet_read_header(s, &length, &channelId))
+			tpktDataPdu = TRUE;
+
+		Stream_SetPosition(s, pos);
+	}
+
+	if (!ptr->mcsDone)
 	{
 		UINT32 options;
 		const char* name;
 
-		mcs_recv_connect_initial(mcs, s);
+		ptr->mcsDone = TRUE;
+
+		mcs_recv_connect_initial(mcs, ptr->mcsPkt);
 
 		settings->NetworkAutoDetect = FALSE;
 		settings->SupportHeartbeatPdu = FALSE;
@@ -503,32 +547,30 @@ int freerdp_packet_client_to_server(rdpContext* context, wStream* s, UINT32 time
 		if (settings->EncomspVirtualChannel && settings->RemdeskVirtualChannel)
 			settings->LyncRdpMode = TRUE;
 	}
-	else if (rdp->state == CONNECTION_STATE_ACTIVE)
+	
+	if (tpktDataPdu)
 	{
-		if (tpkt_verify_header(s))
+		UINT16 length;
+		UINT16 channelId = 0;
+
+		if (!freerdp_packet_read_header(s, &length, &channelId))
+			return 1;
+
+		if (channelId != MCS_GLOBAL_CHANNEL_ID)
 		{
-			UINT16 length;
-			UINT16 channelId = 0;
+			UINT32 length;
+			UINT32 flags;
+			int chunkLength;
 
-			if (!freerdp_packet_read_header(s, &length, &channelId))
-				return 1;
+			if (Stream_GetRemainingLength(s) < 8)
+				return FALSE;
 
-			if (channelId != MCS_GLOBAL_CHANNEL_ID)
-			{
-				UINT32 length;
-				UINT32 flags;
-				int chunkLength;
+			Stream_Read_UINT32(s, length);
+			Stream_Read_UINT32(s, flags);
+			chunkLength = (int) Stream_GetRemainingLength(s);
 
-				if (Stream_GetRemainingLength(s) < 8)
-					return FALSE;
-
-				Stream_Read_UINT32(s, length);
-				Stream_Read_UINT32(s, flags);
-				chunkLength = Stream_GetRemainingLength(s);
-
-				freerdp_packet_server_recv_channel_data(context->instance,
-					channelId, Stream_Pointer(s), chunkLength, flags, length);
-			}
+			freerdp_packet_server_recv_channel_data(context->instance,
+				channelId, Stream_Pointer(s), chunkLength, flags, length);
 		}
 	}
 
@@ -798,7 +840,7 @@ static BOOL transport_bio_pcap_next(BIO* bio)
 			ptr->poffset = 0;
 			ptr->plength = 0;
 
-			freerdp_packet_client_to_server(ptr->context, ptr->cs, 0);
+			freerdp_packet_client_to_server(bio, ptr->context, ptr->cs, 0);
 
 			return transport_bio_pcap_next(bio);
 		}
@@ -807,6 +849,29 @@ static BOOL transport_bio_pcap_next(BIO* bio)
 	}
 
 	return TRUE;
+}
+
+static BOOL transport_bio_pcap_first(BIO* bio)
+{
+	WINPR_BIO_PCAP* ptr = (WINPR_BIO_PCAP*) bio->ptr;
+	rdpContext* context = ptr->context;
+
+	while (transport_bio_pcap_next(bio) && !ptr->firstPass)
+	{
+		fseek(ptr->pcap->fp, ptr->plength, SEEK_CUR);
+		ptr->poffset = 0;
+		ptr->plength = 0;
+	}
+
+	ptr->poffset = 0;
+	ptr->plength = 0;
+	ptr->srcAddress = 0;
+	ptr->dstAddress = 0;
+
+	pcap_close(ptr->pcap);
+	ptr->pcap = pcap_open(ptr->filename, FALSE);
+
+	return ptr->mcsPkt ? TRUE : FALSE;
 }
 
 static long transport_bio_pcap_callback(BIO* bio, int mode, const char* argp, int argi, long argl, long ret)
@@ -841,6 +906,9 @@ static int transport_bio_pcap_read(BIO* bio, char* buf, int size)
 
 	BIO_clear_flags(bio, BIO_FLAGS_READ);
 
+	if (!ptr->firstPass)
+		transport_bio_pcap_first(bio);
+
 	if (!transport_bio_pcap_next(bio))
 		goto failure;
 
@@ -849,7 +917,7 @@ static int transport_bio_pcap_read(BIO* bio, char* buf, int size)
 	if (status > size)
 		status = size;
 
-	status = fread(buf, 1, status, ptr->pcap->fp);
+	status = (int) fread(buf, 1, status, ptr->pcap->fp);
 
 	if (status < 0)
 		goto failure;

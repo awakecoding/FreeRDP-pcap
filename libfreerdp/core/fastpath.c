@@ -399,7 +399,7 @@ static int fastpath_recv_update_data(rdpFastPath* fastpath, wStream* s)
 	cs = s;
 	next_pos = Stream_GetPosition(s) + size;
 
-	if (rdp->settings->ReplayMode && rdp->settings->LyncRdpMode)
+	if (rdp->settings->ReplayMode && rdp->settings->EncomspVirtualChannel)
 	{
 		if (compressionFlags && (fragmentation == FASTPATH_FRAGMENT_SINGLE))
 		{
