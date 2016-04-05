@@ -494,6 +494,25 @@ void RdpDecoder::setFrameCallback(fnFrameCallback func, void* param)
 	m_frameParam = param;
 }
 
+int RdpDecoder::writeBitmap(const char* filename, BYTE* data, int step, int width, int height)
+{
+	int status;
+	wImage img;
+
+	ZeroMemory(&img, sizeof(wImage));
+	img.type = WINPR_IMAGE_BITMAP;
+	img.width = width;
+	img.height = height;
+	img.data = data;
+	img.scanline = step;
+	img.bitsPerPixel = 32;
+	img.bytesPerPixel = 4;
+
+	status = winpr_image_write(&img, filename);
+
+	return status;
+}
+
 bool RdpDecoder::start()
 {
 	int status;

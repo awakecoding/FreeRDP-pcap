@@ -29,6 +29,8 @@ public:
 	void setFinishEvent(HANDLE finishEvent);
 	void setFrameCallback(fnFrameCallback func, void* param);
 
+	int writeBitmap(const char* filename, BYTE* data, int step, int width, int height);
+
 private:
 	void* m_context;
 	void* m_settings;
