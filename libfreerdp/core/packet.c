@@ -58,6 +58,7 @@ struct _WINPR_BIO_PCAP
 	BOOL firstPass;
 	BOOL mcsDone;
 	wStream* mcsPkt;
+	UINT64 timestamp;
 };
 typedef struct _WINPR_BIO_PCAP WINPR_BIO_PCAP;
 
@@ -799,6 +800,9 @@ static BOOL transport_bio_pcap_next(BIO* bio)
 
 		ptr->poffset = 0;
 		ptr->plength = ptr->record.length;
+
+		ptr->timestamp = (ptr->record.header.ts_sec * 1000) + (ptr->record.header.ts_usec / 1000);
+		metrics_set_session_time(context->metrics, ptr->timestamp);
 
 		if (ptr->plength < 54)
 			return FALSE;

@@ -89,6 +89,7 @@ BOOL pf_end_paint(pfContext* pfc)
 {
 	rdpGdi* gdi;
 	HGDI_RGN invalid;
+	UINT64 frameTime;
 	rdpContext* context = (rdpContext*) pfc;
 
 	gdi = context->gdi;
@@ -97,10 +98,12 @@ BOOL pf_end_paint(pfContext* pfc)
 	if (invalid->null)
 		return TRUE;
 
+	frameTime = metrics_get_session_time(context->metrics);
+
 	if (pfc->frameFunc)
 	{
 		pfc->frameFunc(pfc->frameParam, gdi->primary_buffer, gdi->width * 4, gdi->width, gdi->height,
-			invalid->x, invalid->y, invalid->w, invalid->h, 0, pfc->frameIndex);
+			invalid->x, invalid->y, invalid->w, invalid->h, frameTime, pfc->frameIndex);
 	}
 
 	pfc->frameIndex++;
