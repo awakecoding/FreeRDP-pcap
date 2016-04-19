@@ -2171,32 +2171,7 @@ BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_
 	bitmapData->length = new_len;
 
 	if (bitmapData->codecID == 5)
-	{
-		/**
-		 * This appears to be a variant of RemoteFX in image mode:
-		 * regular RemoteFX blocks start at 24 bytes inside the buffer,
-		 * yet 16 bytes are missing at the end of tile blocks.
-		 * If we copy the unknown bytes at the end and remove the
-		 * last 8 bytes, we can decode with color artifacts.
-		 */
-
-		if (bitmapData->length >= 24)
-		{
-			Stream_Read(s, &bitmapData->data[bitmapData->length - 24], 24);
-			Stream_Read(s, bitmapData->data, bitmapData->length - 24);
-			bitmapData->length -= 8;
-		}
-		else
-		{
-			Stream_Read(s, bitmapData->data, bitmapData->length);
-		}
-
 		bitmapData->codecID = RDP_CODEC_ID_IMAGE_REMOTEFX;
-	}
-	else
-	{
-		Stream_Read(s, bitmapData->data, bitmapData->length);
-	}
 
 	return TRUE;
 }

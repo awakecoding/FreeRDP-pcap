@@ -993,9 +993,27 @@ static BOOL rfx_process_message_tileset(RFX_CONTEXT* context, RFX_MESSAGE* messa
 	return rc;
 }
 
+size_t rfx_find_first_block(BYTE* data, size_t length)
+{
+	BYTE* ptr = data;
+
+	while ((ptr - data) < (length - 12))
+	{
+		if ((*((UINT16*) ptr) == WBT_SYNC || *((UINT32*) (ptr + 6)) == WF_MAGIC))
+		{
+			return (ptr - data);
+		}
+
+		ptr++;
+	}
+
+	return 0;
+}
+
 RFX_MESSAGE* rfx_process_message(RFX_CONTEXT* context, BYTE* data, UINT32 length)
 {
 	int pos;
+	size_t offset;
 	UINT32 blockLen;
 	UINT32 blockType;
 	RFX_MESSAGE* message = NULL;
@@ -1005,6 +1023,15 @@ RFX_MESSAGE* rfx_process_message(RFX_CONTEXT* context, BYTE* data, UINT32 length
 
 	if (!context || !data || !length)
 		goto fail;
+
+	offset = rfx_find_first_block(data, length);
+
+	if (offset)
+	{
+		WLog_WARN(TAG, "rfx_process_message: skipping %d bytes", offset);
+		data += offset;
+		length -= offset;
+	}
 
 	if (!(s = Stream_New(data, length)))
 		goto fail;
@@ -1030,7 +1057,8 @@ RFX_MESSAGE* rfx_process_message(RFX_CONTEXT* context, BYTE* data, UINT32 length
 
 		if (Stream_GetRemainingLength(s) < blockLen - 6)
 		{
-			WLog_ERR(TAG, "%s: packet too small for blocklen=%d", __FUNCTION__, blockLen);
+			WLog_ERR(TAG, "%s: packet too small for blockType 0x%04X blocklen=%d (%d)",
+				__FUNCTION__, blockType, blockLen, Stream_GetRemainingLength(s));
 			goto fail;
 		}
 
