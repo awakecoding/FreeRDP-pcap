@@ -332,7 +332,7 @@ static int fastpath_recv_update(rdpFastPath* fastpath, BYTE updateCode, UINT32 s
 			if (!update_read_pointer_new(s, &pointer->pointer_new))
 			{
 				WLog_ERR(TAG, "FASTPATH_UPDATETYPE_POINTER - update_read_pointer_new()");
-				return -1;
+				//return -1; /* workaround */
 			}
 			IFCALL(pointer->PointerNew, context, &pointer->pointer_new);
 			break;
@@ -399,7 +399,7 @@ static int fastpath_recv_update_data(rdpFastPath* fastpath, wStream* s)
 	cs = s;
 	next_pos = Stream_GetPosition(s) + size;
 
-	if (rdp->settings->ReplayMode && rdp->settings->EncomspVirtualChannel)
+	if (rdp->settings->ReplayMode && rdp->settings->EncomspVirtualChannel && 0)
 	{
 		if (compressionFlags && (fragmentation == FASTPATH_FRAGMENT_SINGLE))
 		{

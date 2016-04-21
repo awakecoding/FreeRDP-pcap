@@ -2147,6 +2147,7 @@ BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_
 	bitmapData = &cache_bitmap_v3->bitmapData;
 
 	Stream_Read_UINT8(s, bitmapData->bpp);
+
 	if ((bitmapData->bpp < 1) || (bitmapData->bpp > 32))
 	{
 		WLog_ERR(TAG, "invalid bpp value %d", bitmapData->bpp);
@@ -2169,6 +2170,8 @@ BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_
 	
 	bitmapData->data = new_data;
 	bitmapData->length = new_len;
+
+	Stream_Read(s, bitmapData->data, bitmapData->length);
 
 	if (bitmapData->codecID == 5)
 		bitmapData->codecID = RDP_CODEC_ID_IMAGE_REMOTEFX;
