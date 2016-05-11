@@ -88,7 +88,7 @@ BOOL freerdp_client_codecs_prepare(rdpCodecs* codecs, UINT32 flags)
 		}
 	}
 
-	if ((flags & FREERDP_CODEC_H264) && !codecs->h264)
+	if ((flags & (FREERDP_CODEC_AVC420 | FREERDP_CODEC_AVC444)) && !codecs->h264)
 	{
 		if (!(codecs->h264 = h264_context_new(FALSE)))
 		{
@@ -100,13 +100,9 @@ BOOL freerdp_client_codecs_prepare(rdpCodecs* codecs, UINT32 flags)
 	return TRUE;
 }
 
-BOOL freerdp_client_codecs_reset(rdpCodecs* codecs, UINT32 flags,
-				 UINT32 width, UINT32 height)
+BOOL freerdp_client_codecs_reset(rdpCodecs* codecs, UINT32 flags, UINT32 width, UINT32 height)
 {
 	BOOL rc = TRUE;
-
-	if (!freerdp_client_codecs_prepare(codecs, flags))
-		return FALSE;
 
 	if (flags & FREERDP_CODEC_INTERLEAVED)
 	{
@@ -161,7 +157,7 @@ BOOL freerdp_client_codecs_reset(rdpCodecs* codecs, UINT32 flags,
 		}
 	}
 
-	if (flags & FREERDP_CODEC_H264)
+	if (flags & (FREERDP_CODEC_AVC420 | FREERDP_CODEC_AVC444))
 	{
 		if (codecs->h264)
 		{
@@ -179,9 +175,7 @@ rdpCodecs* codecs_new(rdpContext* context)
 	codecs = (rdpCodecs*) calloc(1, sizeof(rdpCodecs));
 
 	if (codecs)
-	{
 		codecs->context = context;
-	}
 
 	return codecs;
 }

@@ -140,6 +140,4 @@ struct drdynvc_plugin
 	IWTSVirtualChannelManager* channel_mgr;
 };
 
-UINT drdynvc_write_data(drdynvcPlugin* plugin, UINT32 ChannelId, BYTE* data, UINT32 data_size);
-
 #endif

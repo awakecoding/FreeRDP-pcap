@@ -903,6 +903,9 @@ BOOL freerdp_get_param_bool(rdpSettings* settings, int id)
 		case FreeRDP_AuthenticationLevel:
 			return settings->AuthenticationLevel;
 
+		case FreeRDP_VmConnectMode:
+			return settings->VmConnectMode;
+
 		case FreeRDP_MstscCookieMode:
 			return settings->MstscCookieMode;
 
@@ -911,6 +914,9 @@ BOOL freerdp_get_param_bool(rdpSettings* settings, int id)
 
 		case FreeRDP_IgnoreCertificate:
 			return settings->IgnoreCertificate;
+
+		case FreeRDP_AutoAcceptCertificate:
+			return settings->AutoAcceptCertificate;
 
 		case FreeRDP_ExternalCertificateManagement:
 			return settings->ExternalCertificateManagement;
@@ -1109,6 +1115,9 @@ BOOL freerdp_get_param_bool(rdpSettings* settings, int id)
 
 		case FreeRDP_GfxH264:
 			return settings->GfxH264;
+
+		case FreeRDP_GfxAVC444:
+			return settings->GfxAVC444;
 
 		case FreeRDP_DrawNineGridEnabled:
 			return settings->DrawNineGridEnabled;
@@ -1357,6 +1366,10 @@ int freerdp_set_param_bool(rdpSettings* settings, int id, BOOL param)
 			settings->AuthenticationLevel = param;
 			break;
 
+		case FreeRDP_VmConnectMode:
+			settings->VmConnectMode = param;
+			break;
+
 		case FreeRDP_MstscCookieMode:
 			settings->MstscCookieMode = param;
 			break;
@@ -1367,6 +1380,10 @@ int freerdp_set_param_bool(rdpSettings* settings, int id, BOOL param)
 
 		case FreeRDP_IgnoreCertificate:
 			settings->IgnoreCertificate = param;
+			break;
+
+		case FreeRDP_AutoAcceptCertificate:
+			settings->AutoAcceptCertificate = param;
 			break;
 
 		case FreeRDP_ExternalCertificateManagement:
@@ -1631,6 +1648,10 @@ int freerdp_set_param_bool(rdpSettings* settings, int id, BOOL param)
 
 		case FreeRDP_GfxH264:
 			settings->GfxH264 = param;
+			break;
+
+		case FreeRDP_GfxAVC444:
+			settings->GfxAVC444 = param;
 			break;
 
 		case FreeRDP_DrawNineGridEnabled:
