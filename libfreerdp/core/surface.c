@@ -63,7 +63,28 @@ static int update_recv_surfcmd_surface_bits(rdpUpdate* update, wStream* s, UINT3
 	*length = 20 + cmd->bitmapDataLength;
 
 	if (cmd->codecID == 5)
+	{
 		cmd->codecID = RDP_CODEC_ID_IMAGE_REMOTEFX;
+
+		{
+			BYTE* ptr = cmd->bitmapData;
+			int rfxLen = (int) cmd->bitmapDataLength;
+			int rfxOff = 0;
+
+			while ((ptr - cmd->bitmapData) < (rfxLen - 12))
+			{
+				if ((*((UINT16*) ptr) == 0xCCC0 || *((UINT32*) (ptr + 6)) == 0xCACCACCA))
+				{
+					UINT32 off = (ptr - cmd->bitmapData);
+					cmd->bitmapData += off;
+					Stream_SetPosition(s, pos + off);
+					*length += off;
+					break;
+				}
+				ptr++;
+			}
+		}
+	}
 
 	WLog_Print(update->log, WLOG_DEBUG,
 			   "SurfaceBits: destLeft: %d destTop: %d destRight: %d destBottom: %d "

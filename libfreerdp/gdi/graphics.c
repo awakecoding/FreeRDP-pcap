@@ -177,6 +177,25 @@ BOOL gdi_Bitmap_Decompress(rdpContext* context, rdpBitmap* bitmap,
 			RFX_RECT* rect;
 			RFX_MESSAGE* message;
 
+			{
+				BYTE* ptr = data;
+				int rfxLen = (int) SrcSize;
+				int rfxOff = 0;
+
+				while ((ptr - data) < (rfxLen - 12))
+				{
+					if ((*((UINT16*) ptr) == 0xCCC0 || *((UINT32*) (ptr + 6)) == 0xCACCACCA))
+					{
+						UINT32 off = (ptr - data);
+						pSrcData += off;
+						SrcSize -= 2;
+						break;
+					}
+
+					ptr++;
+				}
+			}
+
 			if (!freerdp_client_codecs_prepare(context->codecs, FREERDP_CODEC_REMOTEFX))
 				return FALSE;
 
