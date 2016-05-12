@@ -88,17 +88,14 @@ int freerdp_packet_client_recv_channel_data(freerdp* instance, UINT16 channelId,
 		}
 	}
 
-	if (!channel)
-		return 1;
-
-	if (flags & 0x00200000)
+	if (flags & CHANNEL_PACKET_COMPRESSED)
 	{
 		BYTE* pDstData = NULL;
 		UINT32 DstSize = 0;
 		UINT32 size = dataSize;
 		UINT32 compressionFlags = (flags & 0x00FF0000) >> 16;
 
-		int bulkStatus = bulk_decompress(instance->context->rdp->bulk, data, size, &pDstData, &DstSize, compressionFlags);
+		int bulkStatus = bulk_decompress(context->rdp->bulk, data, size, &pDstData, &DstSize, compressionFlags);
 
 		if (bulkStatus < 0 || (totalSize != DstSize))
 		{
@@ -106,6 +103,9 @@ int freerdp_packet_client_recv_channel_data(freerdp* instance, UINT16 channelId,
 			return -1;
 		}
 	}
+
+	if (!channel)
+		return 1;
 
 	if (!strcmp(channel->Name, "drdynvc"))
 	{
