@@ -59,6 +59,7 @@ struct _WINPR_BIO_PCAP
 	BOOL mcsDone;
 	wStream* mcsPkt;
 	UINT64 timestamp;
+	UINT32 packetIndex;
 };
 typedef struct _WINPR_BIO_PCAP WINPR_BIO_PCAP;
 
@@ -89,6 +90,22 @@ int freerdp_packet_client_recv_channel_data(freerdp* instance, UINT16 channelId,
 
 	if (!channel)
 		return 1;
+
+	if (flags & 0x00200000)
+	{
+		BYTE* pDstData = NULL;
+		UINT32 DstSize = 0;
+		UINT32 size = dataSize;
+		UINT32 compressionFlags = (flags & 0x00FF0000) >> 16;
+
+		int bulkStatus = bulk_decompress(instance->context->rdp->bulk, data, size, &pDstData, &DstSize, compressionFlags);
+
+		if (bulkStatus < 0 || (totalSize != DstSize))
+		{
+			WLog_ERR(TAG, "bulk_decompress() failed");
+			return -1;
+		}
+	}
 
 	if (!strcmp(channel->Name, "drdynvc"))
 	{
@@ -818,6 +835,7 @@ static BOOL transport_bio_pcap_next(BIO* bio)
 
 		ptr->poffset = 0;
 		ptr->plength -= 54;
+		ptr->packetIndex++;
 
 		if (!ptr->srcAddress)
 		{
@@ -874,6 +892,8 @@ static BOOL transport_bio_pcap_first(BIO* bio)
 
 	pcap_close(ptr->pcap);
 	ptr->pcap = pcap_open(ptr->filename, FALSE);
+
+	ptr->packetIndex = 0;
 
 	return ptr->mcsPkt ? TRUE : FALSE;
 }
