@@ -30,10 +30,12 @@
 
 static int update_recv_surfcmd_surface_bits(rdpUpdate* update, wStream* s, UINT32* length)
 {
-	int pos;
+	size_t pos;
 	BYTE reserved1;
 	BYTE reserved2;
 	SURFACE_BITS_COMMAND* cmd = &update->surface_bits_command;
+
+	pos = Stream_GetPosition(s);
 
 	if (Stream_GetRemainingLength(s) < 20)
 		return -1;
@@ -47,17 +49,17 @@ static int update_recv_surfcmd_surface_bits(rdpUpdate* update, wStream* s, UINT3
 	if ((cmd->bpp < 1) || (cmd->bpp > 32))
 	{
 		WLog_ERR(TAG, "invalid bpp value %d", cmd->bpp);
-		return FALSE;
+		return -1;
 	}
 
-	Stream_Read_UINT8(s, reserved1);
-	Stream_Read_UINT8(s, reserved2);
-	Stream_Read_UINT8(s, cmd->codecID);
-	Stream_Read_UINT16(s, cmd->width);
-	Stream_Read_UINT16(s, cmd->height);
-	Stream_Read_UINT32(s, cmd->bitmapDataLength);
+	Stream_Read_UINT8(s, reserved1); /* flags (1 byte) */
+	Stream_Read_UINT8(s, reserved2); /* reserved2 (1 byte) */
+	Stream_Read_UINT8(s, cmd->codecID); /* codecID (1 byte) */
+	Stream_Read_UINT16(s, cmd->width); /* width (2 bytes) */
+	Stream_Read_UINT16(s, cmd->height); /* height (2 bytes) */
+	Stream_Read_UINT32(s, cmd->bitmapDataLength); /* length (4 bytes) */
 
-	if (reserved1 & TS_COMPRESSED_BITMAP_EX_HEADER_FLAG && 0)
+	if (reserved1 & TS_COMPRESSED_BITMAP_EX_HEADER_FLAG)
 	{
 		UINT32 key1;
 		UINT32 key2;
@@ -65,7 +67,7 @@ static int update_recv_surfcmd_surface_bits(rdpUpdate* update, wStream* s, UINT3
 		UINT64 tmSec;
 
 		if (Stream_GetRemainingLength(s) < 24)
-			return FALSE;
+			return -1;
 
 		Stream_Read_UINT32(s, key1); /* key1 (4 bytes) */
 		Stream_Read_UINT32(s, key2); /* key2 (4 bytes) */
@@ -76,50 +78,31 @@ static int update_recv_surfcmd_surface_bits(rdpUpdate* update, wStream* s, UINT3
 	if (Stream_GetRemainingLength(s) < cmd->bitmapDataLength)
 		return -1;
 
-	pos = Stream_GetPosition(s) + cmd->bitmapDataLength;
 	cmd->bitmapData = Stream_Pointer(s);
+	Stream_Seek(s, cmd->bitmapDataLength);
 
-	Stream_SetPosition(s, pos);
-	*length = 20 + cmd->bitmapDataLength;
+	*length = Stream_GetPosition(s) - pos;
 
 	if (cmd->codecID == 5)
-	{
 		cmd->codecID = RDP_CODEC_ID_IMAGE_REMOTEFX;
-
-		if (1)
-		{
-			BYTE* ptr = cmd->bitmapData;
-			int rfxLen = (int) cmd->bitmapDataLength;
-			int rfxOff = 0;
-
-			while ((ptr - cmd->bitmapData) < (rfxLen - 12))
-			{
-				if ((*((UINT16*) ptr) == 0xCCC0 || *((UINT32*) (ptr + 6)) == 0xCACCACCA))
-				{
-					UINT32 off = (ptr - cmd->bitmapData);
-					cmd->bitmapData += off;
-					Stream_SetPosition(s, pos + off);
-					*length += off;
-					break;
-				}
-				ptr++;
-			}
-		}
-	}
 
 	WLog_Print(update->log, WLOG_DEBUG,
 			   "SurfaceBits: destLeft: %d destTop: %d destRight: %d destBottom: %d "
 			   "bpp: %d codecId: %d width: %d height: %d bitmapDataLength: %d",
 			   cmd->destLeft, cmd->destTop, cmd->destRight, cmd->destBottom,
 			   cmd->bpp, cmd->codecID, cmd->width, cmd->height, cmd->bitmapDataLength);
+
 	IFCALL(update->SurfaceBits, update->context, cmd);
 
-	return 0;
+	return 1;
 }
 
 static int update_recv_surfcmd_frame_marker(rdpUpdate* update, wStream* s, UINT32 *length)
 {
+	size_t pos;
 	SURFACE_FRAME_MARKER* marker = &update->surface_frame_marker;
+
+	pos = Stream_GetPosition(s);
 
 	if (Stream_GetRemainingLength(s) < 6)
 		return -1;
@@ -133,9 +116,9 @@ static int update_recv_surfcmd_frame_marker(rdpUpdate* update, wStream* s, UINT3
 
 	IFCALL(update->SurfaceFrameMarker, update->context, marker);
 
-	*length = 6;
+	*length = Stream_GetPosition(s) - pos;
 
-	return 0;
+	return 1;
 }
 
 int update_recv_surfcmds(rdpUpdate* update, UINT32 size, wStream* s)

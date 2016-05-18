@@ -2131,7 +2131,7 @@ BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_
 	BYTE bitsPerPixelId;
 	BITMAP_DATA_EX* bitmapData;
 	UINT32 new_len;
-	BYTE *new_data;
+	BYTE* new_data;
 
 	cache_bitmap_v3->cacheId = flags & 0x00000003;
 	cache_bitmap_v3->flags = (flags & 0x0000FF80) >> 7;
@@ -2139,7 +2139,7 @@ BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_
 	bitsPerPixelId = (flags & 0x00000078) >> 3;
 	cache_bitmap_v3->bpp = CBR23_BPP[bitsPerPixelId];
 
-	if (Stream_GetRemainingLength(s) < 21)
+	if (Stream_GetRemainingLength(s) < 22)
 		return FALSE;
 
 	Stream_Read_UINT16(s, cache_bitmap_v3->cacheIndex); /* cacheIndex (2 bytes) */

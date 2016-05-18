@@ -1008,30 +1008,9 @@ static BOOL rfx_process_message_tileset(RFX_CONTEXT* context, RFX_MESSAGE* messa
 	return rc;
 }
 
-int rfx_find_first_block(BYTE* data, int length)
-{
-	BYTE* ptr = data;
-
-	if (length <= 12)
-		return 0;
-
-	while ((ptr - data) < (length - 12))
-	{
-		if ((*((UINT16*) ptr) == WBT_SYNC || *((UINT32*) (ptr + 6)) == WF_MAGIC))
-		{
-			return (ptr - data);
-		}
-
-		ptr++;
-	}
-
-	return 0;
-}
-
 RFX_MESSAGE* rfx_process_message(RFX_CONTEXT* context, BYTE* data, UINT32 length)
 {
 	int pos;
-	int offset;
 	UINT32 blockLen;
 	UINT32 blockType;
 	RFX_MESSAGE* message = NULL;
@@ -1041,15 +1020,6 @@ RFX_MESSAGE* rfx_process_message(RFX_CONTEXT* context, BYTE* data, UINT32 length
 
 	if (!context || !data || !length)
 		goto fail;
-
-	offset = rfx_find_first_block(data, length);
-
-	if (offset)
-	{
-		WLog_WARN(TAG, "rfx_process_message: skipping %d bytes", offset);
-		data += offset;
-		length -= offset;
-	}
 
 	if (!(s = Stream_New(data, length)))
 		goto fail;
