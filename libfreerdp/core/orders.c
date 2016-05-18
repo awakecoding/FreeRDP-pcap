@@ -30,6 +30,8 @@
 #include <freerdp/graphics.h>
 #include <freerdp/codec/bitmap.h>
 
+#include "surface.h"
+
 #include "orders.h"
 
 #define TAG FREERDP_TAG("core.orders")
@@ -2153,12 +2155,29 @@ BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_
 		WLog_ERR(TAG, "invalid bpp value %d", bitmapData->bpp);
 		return FALSE;
 	}
-	Stream_Read_UINT8(s, reserved1); /* reserved1 (1 byte) */
+
+	Stream_Read_UINT8(s, reserved1); /* flags (1 byte) */
 	Stream_Read_UINT8(s, reserved2); /* reserved2 (1 byte) */
 	Stream_Read_UINT8(s, bitmapData->codecID); /* codecID (1 byte) */
 	Stream_Read_UINT16(s, bitmapData->width); /* width (2 bytes) */
 	Stream_Read_UINT16(s, bitmapData->height); /* height (2 bytes) */
 	Stream_Read_UINT32(s, new_len); /* length (4 bytes) */
+
+	if (reserved1 & TS_COMPRESSED_BITMAP_EX_HEADER_FLAG)
+	{
+		UINT32 key1;
+		UINT32 key2;
+		UINT64 tmMilli;
+		UINT64 tmSec;
+
+		if (Stream_GetRemainingLength(s) < 24)
+			return FALSE;
+
+		Stream_Read_UINT32(s, key1); /* key1 (4 bytes) */
+		Stream_Read_UINT32(s, key2); /* key2 (4 bytes) */
+		Stream_Read_UINT64(s, tmMilli); /* tmMilli (8 bytes) */
+		Stream_Read_UINT64(s, tmSec); /* tmSec (8 bytes) */
+	}
 
 	if (Stream_GetRemainingLength(s) < new_len)
 		return FALSE;

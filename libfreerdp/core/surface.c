@@ -31,6 +31,8 @@
 static int update_recv_surfcmd_surface_bits(rdpUpdate* update, wStream* s, UINT32* length)
 {
 	int pos;
+	BYTE reserved1;
+	BYTE reserved2;
 	SURFACE_BITS_COMMAND* cmd = &update->surface_bits_command;
 
 	if (Stream_GetRemainingLength(s) < 20)
@@ -41,17 +43,35 @@ static int update_recv_surfcmd_surface_bits(rdpUpdate* update, wStream* s, UINT3
 	Stream_Read_UINT16(s, cmd->destRight);
 	Stream_Read_UINT16(s, cmd->destBottom);
 	Stream_Read_UINT8(s, cmd->bpp);
+
 	if ((cmd->bpp < 1) || (cmd->bpp > 32))
 	{
 		WLog_ERR(TAG, "invalid bpp value %d", cmd->bpp);
 		return FALSE;
 	}
 
-	Stream_Seek(s, 2); /* reserved1, reserved2 */
+	Stream_Read_UINT8(s, reserved1);
+	Stream_Read_UINT8(s, reserved2);
 	Stream_Read_UINT8(s, cmd->codecID);
 	Stream_Read_UINT16(s, cmd->width);
 	Stream_Read_UINT16(s, cmd->height);
 	Stream_Read_UINT32(s, cmd->bitmapDataLength);
+
+	if (reserved1 & TS_COMPRESSED_BITMAP_EX_HEADER_FLAG && 0)
+	{
+		UINT32 key1;
+		UINT32 key2;
+		UINT64 tmMilli;
+		UINT64 tmSec;
+
+		if (Stream_GetRemainingLength(s) < 24)
+			return FALSE;
+
+		Stream_Read_UINT32(s, key1); /* key1 (4 bytes) */
+		Stream_Read_UINT32(s, key2); /* key2 (4 bytes) */
+		Stream_Read_UINT64(s, tmMilli); /* tmMilli (8 bytes) */
+		Stream_Read_UINT64(s, tmSec); /* tmSec (8 bytes) */
+	}
 
 	if (Stream_GetRemainingLength(s) < cmd->bitmapDataLength)
 		return -1;
@@ -66,6 +86,7 @@ static int update_recv_surfcmd_surface_bits(rdpUpdate* update, wStream* s, UINT3
 	{
 		cmd->codecID = RDP_CODEC_ID_IMAGE_REMOTEFX;
 
+		if (1)
 		{
 			BYTE* ptr = cmd->bitmapData;
 			int rfxLen = (int) cmd->bitmapDataLength;

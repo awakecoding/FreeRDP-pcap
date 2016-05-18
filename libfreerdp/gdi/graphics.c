@@ -177,6 +177,7 @@ BOOL gdi_Bitmap_Decompress(rdpContext* context, rdpBitmap* bitmap,
 			RFX_RECT* rect;
 			RFX_MESSAGE* message;
 
+			if (0)
 			{
 				BYTE* ptr = data;
 				int rfxLen = (int) SrcSize;
