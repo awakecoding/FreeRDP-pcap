@@ -120,6 +120,9 @@ BOOL pf_desktop_resize(pfContext* pfc)
 	if (!gdi_resize(context->gdi, settings->DesktopWidth, settings->DesktopHeight))
 		return FALSE;
 
+	freerdp_client_codecs_reset(context->codecs, FREERDP_CODEC_ALL,
+		settings->DesktopWidth, settings->DesktopHeight);
+
 	return TRUE;
 }
 

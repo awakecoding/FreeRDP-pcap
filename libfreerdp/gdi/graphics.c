@@ -194,7 +194,7 @@ BOOL gdi_Bitmap_Decompress(rdpContext* context, rdpBitmap* bitmap,
 				rect = &message->rects[0];
 
 				freerdp_image_copy(pDstData, PIXEL_FORMAT_XRGB32, width * 4, 0, 0,
-					width, height, tile->data, PIXEL_FORMAT_XRGB32, width * 4, 0, 0, NULL);
+					width, height, tile->data, PIXEL_FORMAT_XRGB32, 64 * 4, 0, 0, NULL);
 			}
 			else
 			{
