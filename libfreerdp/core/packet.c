@@ -798,6 +798,8 @@ BOOL transport_bio_pcap_process_first_packet(BIO* bio)
 	nego_enable_tls(nego, settings->TlsSecurity);
 	nego_enable_nla(nego, settings->NlaSecurity);
 
+	Stream_Free(s, TRUE);
+
 	return client;
 }
 
@@ -1107,6 +1109,18 @@ static int transport_bio_pcap_uninit(BIO* bio)
 		ptr->cs = NULL;
 	}
 
+	if (ptr->mcsPkt)
+	{
+		Stream_Free(ptr->mcsPkt, TRUE);
+		ptr->mcsPkt = NULL;
+	}
+
+	if (ptr->filename)
+	{
+		free(ptr->filename);
+		ptr->filename = NULL;
+	}
+
 	bio->init = 0;
 	bio->flags = 0;
 
@@ -1135,6 +1149,12 @@ static int transport_bio_pcap_free(BIO* bio)
 {
 	if (!bio)
 		return 0;
+
+	if (bio->next_bio)
+	{
+		BIO_free(bio->next_bio);
+		bio->next_bio = NULL;
+	}
 
 	transport_bio_pcap_uninit(bio);
 

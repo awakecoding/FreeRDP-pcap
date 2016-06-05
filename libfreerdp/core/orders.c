@@ -2130,8 +2130,6 @@ BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_
 	BYTE reserved2;
 	BYTE bitsPerPixelId;
 	BITMAP_DATA_EX* bitmapData;
-	UINT32 new_len;
-	BYTE* new_data;
 
 	cache_bitmap_v3->cacheId = flags & 0x00000003;
 	cache_bitmap_v3->flags = (flags & 0x0000FF80) >> 7;
@@ -2161,7 +2159,7 @@ BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_
 	Stream_Read_UINT8(s, bitmapData->codecID); /* codecID (1 byte) */
 	Stream_Read_UINT16(s, bitmapData->width); /* width (2 bytes) */
 	Stream_Read_UINT16(s, bitmapData->height); /* height (2 bytes) */
-	Stream_Read_UINT32(s, new_len); /* length (4 bytes) */
+	Stream_Read_UINT32(s, bitmapData->length); /* length (4 bytes) */
 
 	if (reserved1 & TS_COMPRESSED_BITMAP_EX_HEADER_FLAG)
 	{
@@ -2179,18 +2177,11 @@ BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_
 		Stream_Read_UINT64(s, tmSec); /* tmSec (8 bytes) */
 	}
 
-	if (Stream_GetRemainingLength(s) < new_len)
+	if (Stream_GetRemainingLength(s) < bitmapData->length)
 		return FALSE;
 
-	new_data = (BYTE*) realloc(bitmapData->data, new_len);
-
-	if (!new_data)
-		return FALSE;
-	
-	bitmapData->data = new_data;
-	bitmapData->length = new_len;
-
-	Stream_Read(s, bitmapData->data, bitmapData->length);
+	Stream_GetPointer(s, bitmapData->data);
+	Stream_Seek(s, bitmapData->length);
 
 	if (bitmapData->codecID == 5)
 		bitmapData->codecID = RDP_CODEC_ID_IMAGE_REMOTEFX;

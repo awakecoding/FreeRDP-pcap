@@ -32,6 +32,7 @@
 #include <freerdp/freerdp.h>
 #include <freerdp/gdi/gfx.h>
 #include <freerdp/gdi/region.h>
+#include <freerdp/primitives.h>
 #include <freerdp/codec/region.h>
 #include <freerdp/client/cmdline.h>
 #include <freerdp/client/channels.h>
@@ -214,7 +215,7 @@ BOOL pf_post_connect(freerdp* instance)
 
 void pf_post_disconnect(freerdp* instance)
 {
-
+	
 }
 
 static BOOL pf_authenticate(freerdp* instance, char** username, char** password, char** domain)
@@ -269,6 +270,8 @@ DWORD WINAPI pf_client_thread(LPVOID lpParam)
 			break;
 	}
 
+	freerdp_disconnect(instance);
+
 	if (pfc->finishEvent)
 		SetEvent(pfc->finishEvent);
 
@@ -318,8 +321,15 @@ void pfreerdp_client_free(freerdp* instance, rdpContext* context)
 	if (!context)
 		return;
 
+	if (context->gdi)
+	{
+		gdi_free(instance);
+		context->gdi = NULL;
+	}
+
 	if (context->channels)
 	{
+		freerdp_channels_disconnect(context->channels, instance);
 		freerdp_channels_close(context->channels, instance);
 		freerdp_channels_free(context->channels);
 		context->channels = NULL;
@@ -558,14 +568,30 @@ bool RdpDecoder::stop()
 	return true;
 }
 
+static int g_RefCount = 0;
+
 RdpDecoder::RdpDecoder():
 	m_context(NULL), m_settings(NULL), m_filename(NULL),
 	m_frameParam(NULL), m_frameFunc(NULL), m_finishEvent(NULL)
 {
+	if (g_RefCount == 0)
+	{
+		WLog_Init();
+		primitives_init();
+	}
 
+	g_RefCount++;
 }
 
 RdpDecoder::~RdpDecoder()
 {
 	close();
+
+	g_RefCount--;
+
+	if (g_RefCount == 0)
+	{
+		primitives_deinit();
+		WLog_Uninit();
+	}
 }
