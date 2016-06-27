@@ -1139,7 +1139,8 @@ static UINT rdpgfx_recv_pdu(RDPGFX_CHANNEL_CALLBACK* callback, wStream* s)
 	{
 		WLog_ERR(TAG,  "Error while parsing GFX cmdId: %s (0x%04X)",
 				 rdpgfx_get_cmd_id_string(header.cmdId), header.cmdId);
-		return error;
+		Stream_SetPosition(s, (beg + header.pduLength));
+		return 0;
 	}
 
 	end = Stream_GetPosition(s);

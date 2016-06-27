@@ -151,7 +151,7 @@ BOOL gdi_Bitmap_Decompress(rdpContext* context, rdpBitmap* bitmap,
 		BYTE* data, int width, int height, int bpp, int length,
 		BOOL compressed, int codecId)
 {
-	int status;
+	int status = -1;
 	UINT16 size;
 	BYTE* pSrcData;
 	BYTE* pDstData;
