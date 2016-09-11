@@ -118,7 +118,6 @@ BOOL update_gdi_cache_bitmap(rdpContext* context, CACHE_BITMAP_ORDER* cacheBitma
 }
 
 BOOL update_gdi_cache_bitmap_v2(rdpContext* context, CACHE_BITMAP_V2_ORDER* cacheBitmapV2)
-
 {
 	rdpBitmap* bitmap;
 	rdpBitmap* prevBitmap;
@@ -304,6 +303,34 @@ void bitmap_cache_register_callbacks(rdpUpdate* update)
 	update->BitmapUpdate = update_gdi_bitmap_update;
 }
 
+int bitmap_cache_load_persistent(rdpBitmapCache* bitmapCache)
+{
+	int status;
+	int version;
+	rdpPersistentCache* persistent;
+	rdpSettings* settings = bitmapCache->settings;
+
+	if (!settings->BitmapCachePersistEnabled)
+		return 1;
+
+	if (!settings->BitmapCachePersistFile)
+		return 1;
+
+	persistent = persistent_cache_new();
+
+	if (!persistent)
+		return -1;
+
+	status = persistent_cache_open(persistent, settings->BitmapCachePersistFile, FALSE, -1);
+
+	if (status < 1)
+		return -1;
+
+	version = persistent_cache_get_version(persistent);
+
+	return 1;
+}
+
 rdpBitmapCache* bitmap_cache_new(rdpSettings* settings)
 {
 	int i;
@@ -311,29 +338,31 @@ rdpBitmapCache* bitmap_cache_new(rdpSettings* settings)
 
 	bitmapCache = (rdpBitmapCache*) calloc(1, sizeof(rdpBitmapCache));
 
-	if (bitmapCache)
+	if (!bitmapCache)
+		return NULL;
+
+	bitmapCache->settings = settings;
+	bitmapCache->update = ((freerdp*) settings->instance)->update;
+	bitmapCache->context = bitmapCache->update->context;
+
+	bitmapCache->maxCells = settings->BitmapCacheV2NumCells;
+
+	bitmapCache->cells = (BITMAP_V2_CELL*) calloc(bitmapCache->maxCells, sizeof(BITMAP_V2_CELL));
+
+	if (!bitmapCache->cells)
 	{
-		bitmapCache->settings = settings;
-		bitmapCache->update = ((freerdp*) settings->instance)->update;
-		bitmapCache->context = bitmapCache->update->context;
-
-		bitmapCache->maxCells = settings->BitmapCacheV2NumCells;
-
-		bitmapCache->cells = (BITMAP_V2_CELL*) calloc(bitmapCache->maxCells, sizeof(BITMAP_V2_CELL));
-
-		if (!bitmapCache->cells)
-		{
-			free(bitmapCache);
-			return NULL;
-		}
-
-		for (i = 0; i < (int) bitmapCache->maxCells; i++)
-		{
-			bitmapCache->cells[i].number = settings->BitmapCacheV2CellInfo[i].numEntries;
-			/* allocate an extra entry for BITMAP_CACHE_WAITING_LIST_INDEX */
-			bitmapCache->cells[i].entries = (rdpBitmap**) calloc((bitmapCache->cells[i].number + 1), sizeof(rdpBitmap*));
-		}
+		free(bitmapCache);
+		return NULL;
 	}
+
+	for (i = 0; i < (int) bitmapCache->maxCells; i++)
+	{
+		bitmapCache->cells[i].number = settings->BitmapCacheV2CellInfo[i].numEntries;
+		/* allocate an extra entry for BITMAP_CACHE_WAITING_LIST_INDEX */
+		bitmapCache->cells[i].entries = (rdpBitmap**) calloc((bitmapCache->cells[i].number + 1), sizeof(rdpBitmap*));
+	}
+
+	bitmap_cache_load_persistent(bitmapCache);
 
 	return bitmapCache;
 }
@@ -343,25 +372,27 @@ void bitmap_cache_free(rdpBitmapCache* bitmapCache)
 	int i, j;
 	rdpBitmap* bitmap;
 
-	if (bitmapCache)
+	if (!bitmapCache)
+		return;
+
+	for (i = 0; i < (int) bitmapCache->maxCells; i++)
 	{
-		for (i = 0; i < (int) bitmapCache->maxCells; i++)
+		for (j = 0; j < (int) bitmapCache->cells[i].number + 1; j++)
 		{
-			for (j = 0; j < (int) bitmapCache->cells[i].number + 1; j++)
-			{
-				bitmap = bitmapCache->cells[i].entries[j];
+			bitmap = bitmapCache->cells[i].entries[j];
 
-				if (bitmap)
-					Bitmap_Free(bitmapCache->context, bitmap);
-			}
-
-			free(bitmapCache->cells[i].entries);
+			if (bitmap)
+				Bitmap_Free(bitmapCache->context, bitmap);
 		}
 
-		if (bitmapCache->bitmap)
-			Bitmap_Free(bitmapCache->context, bitmapCache->bitmap);
-
-		free(bitmapCache->cells);
-		free(bitmapCache);
+		free(bitmapCache->cells[i].entries);
 	}
+
+	if (bitmapCache->bitmap)
+		Bitmap_Free(bitmapCache->context, bitmapCache->bitmap);
+
+	persistent_cache_free(bitmapCache->persistent);
+	
+	free(bitmapCache->cells);
+	free(bitmapCache);
 }

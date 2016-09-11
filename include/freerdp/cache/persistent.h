@@ -32,6 +32,52 @@ typedef struct rdp_persistent_cache rdpPersistentCache;
 
 #include <freerdp/cache/cache.h>
 
+#pragma pack(push, 1)
+
+/* 12 bytes */
+
+struct _PERSISTENT_CACHE_HEADER_V3
+{
+	BYTE sig[8];
+	UINT32 flags; /* 0x00000003, 0x00000006 */
+};
+typedef struct _PERSISTENT_CACHE_HEADER_V3 PERSISTENT_CACHE_HEADER_V3;
+
+/* 12 bytes */
+
+struct _PERSISTENT_CACHE_ENTRY_V3
+{
+	UINT64 key64;
+	UINT16 width;
+	UINT16 height;
+};
+typedef struct _PERSISTENT_CACHE_ENTRY_V3 PERSISTENT_CACHE_ENTRY_V3;
+
+/* 20 bytes */
+
+struct _PERSISTENT_CACHE_ENTRY_V2
+{
+	UINT64 key64;
+	UINT16 width;
+	UINT16 height;
+	UINT32 size;
+	UINT32 flags; /* 0x00000011 */
+};
+typedef struct _PERSISTENT_CACHE_ENTRY_V2 PERSISTENT_CACHE_ENTRY_V2;
+
+#pragma pack(pop)
+
+struct _PERSISTENT_CACHE_ENTRY
+{
+	UINT64 key64;
+	UINT16 width;
+	UINT16 height;
+	UINT32 size;
+	UINT32 flags;
+	BYTE* data;
+};
+typedef struct _PERSISTENT_CACHE_ENTRY PERSISTENT_CACHE_ENTRY;
+
 struct rdp_persistent_cache
 {
 	FILE* fp;
@@ -39,11 +85,18 @@ struct rdp_persistent_cache
 	int version;
 	int count;
 	char* filename;
+	BYTE* bmpData;
+	UINT32 bmpSize;
 };
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+FREERDP_API int persistent_cache_get_version(rdpPersistentCache* persistent);
+FREERDP_API int persistent_cache_get_count(rdpPersistentCache* persistent);
+
+FREERDP_API int persistent_cache_read_entry(rdpPersistentCache* persistent, PERSISTENT_CACHE_ENTRY* entry);
 
 FREERDP_API int persistent_cache_open(rdpPersistentCache* persistent, const char* filename, BOOL write, int version);
 FREERDP_API int persistent_cache_close(rdpPersistentCache* persistent);

@@ -32,40 +32,36 @@
 
 #define TAG FREERDP_TAG("cache.persistent")
 
-#pragma pack(push, 1)
-
-/* 20 bytes */
-
-struct _PERSISTENT_CACHE_ENTRY_V2
+int persistent_cache_get_version(rdpPersistentCache* persistent)
 {
-	UINT64 key64;
-	UINT16 width;
-	UINT16 height;
-	UINT32 size;
-	UINT32 flags; /* 0x00000011 */
-};
-typedef struct _PERSISTENT_CACHE_ENTRY_V2 PERSISTENT_CACHE_ENTRY_V2;
+	return persistent->version;
+}
 
-/* 12 bytes */
-
-struct _PERSISTENT_CACHE_HEADER_V3
+int persistent_cache_get_count(rdpPersistentCache* persistent)
 {
-	BYTE sig[8];
-	UINT32 flags; /* 0x00000003, 0x00000006 */
-};
-typedef struct _PERSISTENT_CACHE_HEADER_V3 PERSISTENT_CACHE_HEADER_V3;
+	return persistent->count;
+}
 
-/* 12 bytes */
-
-struct _PERSISTENT_CACHE_ENTRY_V3
+int persistent_cache_read_entry_v2(rdpPersistentCache* persistent, PERSISTENT_CACHE_ENTRY* entry)
 {
-	UINT64 key64;
-	UINT16 width;
-	UINT16 height;
-};
-typedef struct _PERSISTENT_CACHE_ENTRY_V3 PERSISTENT_CACHE_ENTRY_V3;
+	PERSISTENT_CACHE_ENTRY_V2 entry2;
 
-#pragma pack(pop)
+	if (fread((void*) &entry2, sizeof(PERSISTENT_CACHE_ENTRY_V2), 1, persistent->fp) != 1)
+		return -1;
+
+	entry->key64 = entry2.key64;
+	entry->width = entry2.width;
+	entry->height = entry2.height;
+	entry->size = entry2.width * entry2.height * 4;
+	entry->flags = entry2.flags;
+
+	entry->data = persistent->bmpData;
+
+	if (fread((void*) entry->data, 0x4000, 1, persistent->fp) != 0)
+		return -1;
+
+	return 1;
+}
 
 int persistent_cache_read_v2(rdpPersistentCache* persistent)
 {
@@ -81,6 +77,36 @@ int persistent_cache_read_v2(rdpPersistentCache* persistent)
 
 		persistent->count++;
 	}
+
+	return 1;
+}
+
+int persistent_cache_read_entry_v3(rdpPersistentCache* persistent, PERSISTENT_CACHE_ENTRY* entry)
+{
+	PERSISTENT_CACHE_ENTRY_V3 entry3;
+
+	if (fread((void*) &entry3, sizeof(PERSISTENT_CACHE_ENTRY_V3), 1, persistent->fp) != 1)
+		return -1;
+
+	entry->key64 = entry3.key64;
+	entry->width = entry3.width;
+	entry->height = entry3.height;
+	entry->size = entry3.width * entry3.height * 4;
+	entry->flags = 0;
+
+	if (entry->size > persistent->bmpSize)
+	{
+		persistent->bmpSize = entry->size;
+		persistent->bmpData = (BYTE*) realloc(persistent->bmpData, persistent->bmpSize);
+
+		if (!persistent->bmpData)
+			return -1;
+	}
+
+	entry->data = persistent->bmpData;
+
+	if (fread((void*) entry->data, entry->size, 1, persistent->fp) != 0)
+		return -1;
 
 	return 1;
 }
@@ -101,6 +127,16 @@ int persistent_cache_read_v3(rdpPersistentCache* persistent)
 	}
 
 	return 1;
+}
+
+int persistent_cache_read_entry(rdpPersistentCache* persistent, PERSISTENT_CACHE_ENTRY* entry)
+{
+	if (persistent->version == 3)
+		return persistent_cache_read_entry_v3(persistent, entry);
+	else if (persistent->version == 2)
+		return persistent_cache_read_entry_v2(persistent, entry);
+
+	return -1;
 }
 
 int persistent_cache_open_read(rdpPersistentCache* persistent)
@@ -130,10 +166,14 @@ int persistent_cache_open_read(rdpPersistentCache* persistent)
 			return -1;
 
 		status = persistent_cache_read_v3(persistent);
+
+		fseek(persistent->fp, sizeof(PERSISTENT_CACHE_HEADER_V3), SEEK_SET);
 	}
 	else
 	{
 		status = persistent_cache_read_v2(persistent);
+
+		fseek(persistent->fp, 0, SEEK_SET);
 	}
 
 	return status;
@@ -187,6 +227,12 @@ rdpPersistentCache* persistent_cache_new()
 	if (!persistent)
 		return NULL;
 
+	persistent->bmpSize = 0x4000;
+	persistent->bmpData = (BYTE*) malloc(persistent->bmpSize);
+
+	if (!persistent->bmpData)
+		return NULL;
+
 	return persistent;
 }
 
@@ -198,6 +244,8 @@ void persistent_cache_free(rdpPersistentCache* persistent)
 	persistent_cache_close(persistent);
 
 	free(persistent->filename);
+
+	free(persistent->bmpData);
 
 	free(persistent);
 }

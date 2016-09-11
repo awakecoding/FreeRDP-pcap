@@ -1099,6 +1099,11 @@ UINT gdi_CacheImportReply(RdpgfxClientContext* context, RDPGFX_CACHE_IMPORT_REPL
 	{
 		cacheSlot = slots[index];
 
+		cacheEntry = (gdiGfxCacheEntry*) context->GetCacheSlotData(context, cacheSlot);
+
+		if (cacheEntry)
+			continue;
+
 		cacheEntry = (gdiGfxCacheEntry*) calloc(1, sizeof(gdiGfxCacheEntry));
 
 		if (!cacheEntry)
@@ -1115,6 +1120,40 @@ UINT gdi_CacheImportReply(RdpgfxClientContext* context, RDPGFX_CACHE_IMPORT_REPL
 
 		context->SetCacheSlotData(context, cacheSlot, (void*) cacheEntry);
 	}
+
+	return CHANNEL_RC_OK;
+}
+
+UINT gdi_ImportCacheEntry(RdpgfxClientContext* context, UINT16 cacheSlot, PERSISTENT_CACHE_ENTRY* importCacheEntry)
+{
+	gdiGfxCacheEntry* cacheEntry;
+	rdpGdi* gdi = (rdpGdi*) context->custom;
+
+	cacheEntry = (gdiGfxCacheEntry*) calloc(1, sizeof(gdiGfxCacheEntry));
+
+	if (!cacheEntry)
+		return ERROR_INTERNAL_ERROR;
+
+	cacheEntry->width = (UINT32) importCacheEntry->width;
+	cacheEntry->height = (UINT32) importCacheEntry->height;
+	cacheEntry->alpha = FALSE;
+
+	cacheEntry->format = (!gdi->invert) ? PIXEL_FORMAT_XRGB32 : PIXEL_FORMAT_XBGR32;
+
+	cacheEntry->scanline = (cacheEntry->width + (cacheEntry->width % 4)) * 4;
+	cacheEntry->data = (BYTE*) calloc(1, cacheEntry->scanline * cacheEntry->height);
+
+	if (!cacheEntry->data)
+	{
+		free(cacheEntry);
+		return ERROR_INTERNAL_ERROR;
+	}
+
+	freerdp_image_copy(cacheEntry->data, cacheEntry->format, cacheEntry->scanline,
+		0, 0, cacheEntry->width, cacheEntry->height, importCacheEntry->data,
+		PIXEL_FORMAT_XRGB32, -1, 0, 0, NULL);
+
+	context->SetCacheSlotData(context, cacheSlot, (void*) cacheEntry);
 
 	return CHANNEL_RC_OK;
 }
@@ -1191,6 +1230,7 @@ void gdi_graphics_pipeline_init(rdpGdi* gdi, RdpgfxClientContext* gfx)
 	gfx->SurfaceToCache = gdi_SurfaceToCache;
 	gfx->CacheToSurface = gdi_CacheToSurface;
 	gfx->CacheImportReply = gdi_CacheImportReply;
+	gfx->ImportCacheEntry = gdi_ImportCacheEntry;
 	gfx->EvictCacheEntry = gdi_EvictCacheEntry;
 	gfx->MapSurfaceToOutput = gdi_MapSurfaceToOutput;
 	gfx->MapSurfaceToWindow = gdi_MapSurfaceToWindow;

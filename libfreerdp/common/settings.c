@@ -2506,6 +2506,9 @@ char* freerdp_get_param_string(rdpSettings* settings, int id)
 		case FreeRDP_RemoteApplicationCmdLine:
 			return settings->RemoteApplicationCmdLine;
 
+		case FreeRDP_BitmapCachePersistFile:
+			return settings->BitmapCachePersistFile;
+
 		case FreeRDP_ImeFileName:
 			return settings->ImeFileName;
 
@@ -2709,6 +2712,10 @@ int freerdp_set_param_string(rdpSettings* settings, int id, const char* param)
 
 		case FreeRDP_RemoteApplicationCmdLine:
 			tmp = &settings->RemoteApplicationCmdLine;
+			break;
+
+		case FreeRDP_BitmapCachePersistFile:
+			tmp = &settings->BitmapCachePersistFile;
 			break;
 
 		case FreeRDP_ImeFileName:
