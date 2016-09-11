@@ -613,7 +613,7 @@ static UINT rdpgfx_recv_start_frame_pdu(RDPGFX_CHANNEL_CALLBACK* callback, wStre
 	RdpgfxClientContext* context = (RdpgfxClientContext*) gfx->iface.pInterface;
 	UINT error = CHANNEL_RC_OK;
 
-	if (Stream_GetRemainingLength(s) < 8)
+	if (Stream_GetRemainingLength(s) < RDPGFX_START_FRAME_PDU_SIZE)
 	{
 		WLog_ERR(TAG, "not enough data!");
 		return ERROR_INVALID_DATA;
@@ -650,7 +650,7 @@ static UINT rdpgfx_recv_end_frame_pdu(RDPGFX_CHANNEL_CALLBACK* callback, wStream
 	RdpgfxClientContext* context = (RdpgfxClientContext*) gfx->iface.pInterface;
 	UINT error = CHANNEL_RC_OK;
 
-	if (Stream_GetRemainingLength(s) < 4)
+	if (Stream_GetRemainingLength(s) < RDPGFX_END_FRAME_PDU_SIZE)
 	{
 		WLog_ERR(TAG, "not enough data!");
 		return ERROR_INVALID_DATA;
@@ -706,7 +706,7 @@ static UINT rdpgfx_recv_wire_to_surface_1_pdu(RDPGFX_CHANNEL_CALLBACK* callback,
 	RDPGFX_PLUGIN* gfx = (RDPGFX_PLUGIN*) callback->plugin;
 	UINT error;
 
-	if (Stream_GetRemainingLength(s) < 17)
+	if (Stream_GetRemainingLength(s) < RDPGFX_WIRE_TO_SURFACE_PDU_1_SIZE)
 	{
 		WLog_ERR(TAG, "not enough data!");
 		return ERROR_INVALID_DATA;
@@ -774,7 +774,7 @@ static UINT rdpgfx_recv_wire_to_surface_2_pdu(RDPGFX_CHANNEL_CALLBACK* callback,
 	RdpgfxClientContext* context = (RdpgfxClientContext*) gfx->iface.pInterface;
 	UINT error = CHANNEL_RC_OK;
 
-	if (Stream_GetRemainingLength(s) < 13)
+	if (Stream_GetRemainingLength(s) < RDPGFX_WIRE_TO_SURFACE_PDU_2_SIZE)
 	{
 		WLog_ERR(TAG, "not enough data!");
 		return ERROR_INVALID_DATA;
@@ -1691,7 +1691,7 @@ void* rdpgfx_get_cache_slot_data(RdpgfxClientContext* context, UINT16 cacheSlot)
 	return pData;
 }
 
-#ifdef STATIC_CHANNELS
+#ifdef BUILTIN_CHANNELS
 #define DVCPluginEntry		rdpgfx_DVCPluginEntry
 #else
 #define DVCPluginEntry		FREERDP_API DVCPluginEntry

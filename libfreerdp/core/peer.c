@@ -476,6 +476,10 @@ static int peer_recv_callback(rdpTransport* transport, wStream* s, void* extra)
 				return -1;
 			}
 
+			client->settings->NlaSecurity = (rdp->nego->SelectedProtocol & PROTOCOL_NLA) ? TRUE : FALSE;
+			client->settings->TlsSecurity = (rdp->nego->SelectedProtocol & PROTOCOL_TLS) ? TRUE : FALSE;
+			client->settings->RdpSecurity = (rdp->nego->SelectedProtocol & PROTOCOL_RDP) ? TRUE : FALSE;
+
 			if (rdp->nego->SelectedProtocol & PROTOCOL_NLA)
 			{
 				sspi_CopyAuthIdentity(&client->identity, rdp->nego->transport->nla->identity);
@@ -686,6 +690,7 @@ BOOL freerdp_peer_context_new(freerdp_peer* client)
 
 	context->peer = client;
 	context->ServerMode = TRUE;
+	context->settings = client->settings;
 
 	if (!(context->metrics = metrics_new(context)))
 		goto fail_metrics;
@@ -711,6 +716,12 @@ BOOL freerdp_peer_context_new(freerdp_peer* client)
 	update_register_server_callbacks(client->update);
 	autodetect_register_server_callbacks(client->autodetect);
 
+	if (!(context->errorDescription = calloc(1, 500)))
+	{
+		WLog_ERR(TAG, "calloc failed!");
+		goto fail_error_description;
+	}
+
 	if (!transport_attach(rdp->transport, client->sockfd))
 		goto fail_transport_attach;
 
@@ -729,6 +740,8 @@ BOOL freerdp_peer_context_new(freerdp_peer* client)
 	WLog_ERR(TAG, "ContextNew callback failed");
 
 fail_transport_attach:
+	free(context->errorDescription);
+fail_error_description:
 	rdp_free(client->context->rdp);
 fail_rdp:
 	metrics_free(context->metrics);
@@ -745,7 +758,20 @@ void freerdp_peer_context_free(freerdp_peer* client)
 {
 	IFCALL(client->ContextFree, client, client->context);
 
-	metrics_free(client->context->metrics);
+	if (client->context)
+	{
+		free(client->context->errorDescription);
+		client->context->errorDescription = NULL;
+
+		rdp_free(client->context->rdp);
+		client->context->rdp = NULL;
+
+		metrics_free(client->context->metrics);
+		client->context->metrics = NULL;
+
+		free(client->context);
+		client->context = NULL;
+	}
 }
 
 freerdp_peer* freerdp_peer_new(int sockfd)
@@ -793,10 +819,5 @@ void freerdp_peer_free(freerdp_peer* client)
 	if (!client)
 		return;
 
-	if (client->context)
-	{
-		rdp_free(client->context->rdp);
-		free(client->context);
-	}
 	free(client);
 }

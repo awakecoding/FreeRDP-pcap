@@ -598,6 +598,7 @@ rdpSettings* freerdp_settings_clone(rdpSettings* settings)
 		CHECKED_STRDUP(RemoteAssistanceRCTicket); /* 1028 */
 		CHECKED_STRDUP(AuthenticationServiceClass); /* 1098 */
 		CHECKED_STRDUP(AllowedTlsCiphers); /* 1101 */
+		CHECKED_STRDUP(NtlmSamFile); /* 1103 */
 		CHECKED_STRDUP(PreconnectionBlob); /* 1155 */
 		CHECKED_STRDUP(KerberosKdc); /* 1344 */
 		CHECKED_STRDUP(KerberosRealm); /* 1345 */
@@ -921,6 +922,7 @@ void freerdp_settings_free(rdpSettings* settings)
     free(settings->ClientAddress);
     free(settings->ClientDir);
     free(settings->AllowedTlsCiphers);
+    free(settings->NtlmSamFile);
     free(settings->CertificateFile);
     free(settings->PrivateKeyFile);
     free(settings->ConnectionFile);
@@ -965,6 +967,24 @@ void freerdp_settings_free(rdpSettings* settings)
     free(settings->GatewayUsername);
     free(settings->GatewayPassword);
     free(settings->GatewayDomain);
+    free(settings->CertificateName);
+    free(settings->DynamicDSTTimeZoneKeyName);
+    free(settings->PreconnectionBlob);
+    free(settings->KerberosKdc);
+    free(settings->KerberosRealm);
+    free(settings->DumpRemoteFxFile);
+    free(settings->PlayRemoteFxFile);
+    free(settings->RemoteApplicationName);
+    free(settings->RemoteApplicationIcon);
+    free(settings->RemoteApplicationProgram);
+    free(settings->RemoteApplicationFile);
+    free(settings->RemoteApplicationGuid);
+    free(settings->RemoteApplicationCmdLine);
+    free(settings->ImeFileName);
+    free(settings->DrivesToRedirect);
+    free(settings->WindowTitle);
+    free(settings->WmClass);
+
     freerdp_target_net_addresses_free(settings);
     freerdp_device_collection_free(settings);
     freerdp_static_channel_collection_free(settings);
