@@ -177,7 +177,7 @@ BOOL gdi_Bitmap_Decompress(rdpContext* context, rdpBitmap* bitmap,
 			RFX_RECT* rect;
 			RFX_MESSAGE* message;
 
-			if (!freerdp_client_codecs_prepare(context->codecs, FREERDP_CODEC_REMOTEFX))
+			if (!freerdp_client_codecs_prepare(context->codecs, FREERDP_CODEC_REMOTEFX, gdi->width, gdi->height))
 				return FALSE;
 
 			message = rfx_process_message(context->codecs->rfx, pSrcData, SrcSize);
@@ -208,7 +208,7 @@ BOOL gdi_Bitmap_Decompress(rdpContext* context, rdpBitmap* bitmap,
 		}
 		else if (codecId == RDP_CODEC_ID_NSCODEC)
 		{
-			if (!freerdp_client_codecs_prepare(context->codecs, FREERDP_CODEC_NSCODEC))
+			if (!freerdp_client_codecs_prepare(context->codecs, FREERDP_CODEC_NSCODEC, gdi->width, gdi->height))
 				return FALSE;
 
 			status = nsc_process_message(context->codecs->nsc, 32, width, height, pSrcData, SrcSize);

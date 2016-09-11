@@ -2644,15 +2644,6 @@ BOOL freerdp_client_load_addins(rdpChannels* channels, rdpSettings* settings)
 		settings->RemdeskVirtualChannel = TRUE;
 	}
 
-	if (settings->DynamicChannelCount)
-		settings->SupportDynamicChannels = TRUE;
-
-	if (settings->SupportDynamicChannels)
-	{
-		if (!freerdp_client_load_static_channel_addin(channels, settings, "drdynvc", settings))
-			return FALSE;
-	}
-
 	for (index = 0; index < settings->StaticChannelCount; index++)
 	{
 		args = settings->StaticChannelArray[index];
@@ -2724,6 +2715,15 @@ BOOL freerdp_client_load_addins(rdpChannels* channels, rdpSettings* settings)
 		p[0] = "disp";
 
 		if (!freerdp_client_add_dynamic_channel(settings, count, p))
+			return FALSE;
+	}
+
+	if (settings->DynamicChannelCount)
+		settings->SupportDynamicChannels = TRUE;
+
+	if (settings->SupportDynamicChannels)
+	{
+		if (!freerdp_client_load_static_channel_addin(channels, settings, "drdynvc", settings))
 			return FALSE;
 	}
 
