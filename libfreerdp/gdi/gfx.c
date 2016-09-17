@@ -1012,6 +1012,7 @@ UINT gdi_SurfaceToCache(RdpgfxClientContext* context, RDPGFX_SURFACE_TO_CACHE_PD
 	if (!cacheEntry)
 		return ERROR_INTERNAL_ERROR;
 
+	cacheEntry->cacheKey = surfaceToCache->cacheKey;
 	cacheEntry->width = (UINT32) (rect->right - rect->left);
 	cacheEntry->height = (UINT32) (rect->bottom - rect->top);
 	cacheEntry->alpha = surface->alpha;
@@ -1134,6 +1135,7 @@ UINT gdi_ImportCacheEntry(RdpgfxClientContext* context, UINT16 cacheSlot, PERSIS
 	if (!cacheEntry)
 		return ERROR_INTERNAL_ERROR;
 
+	cacheEntry->cacheKey = importCacheEntry->key64;
 	cacheEntry->width = (UINT32) importCacheEntry->width;
 	cacheEntry->height = (UINT32) importCacheEntry->height;
 	cacheEntry->alpha = FALSE;
@@ -1158,6 +1160,27 @@ UINT gdi_ImportCacheEntry(RdpgfxClientContext* context, UINT16 cacheSlot, PERSIS
 	return CHANNEL_RC_OK;
 }
 
+UINT gdi_ExportCacheEntry(RdpgfxClientContext* context, UINT16 cacheSlot, PERSISTENT_CACHE_ENTRY* exportCacheEntry)
+{
+	gdiGfxCacheEntry* cacheEntry;
+	rdpGdi* gdi = (rdpGdi*) context->custom;
+
+	cacheEntry = (gdiGfxCacheEntry*) context->GetCacheSlotData(context, cacheSlot);
+
+	if (cacheEntry)
+	{
+		exportCacheEntry->key64 = cacheEntry->cacheKey;
+		exportCacheEntry->width = cacheEntry->width;
+		exportCacheEntry->height = cacheEntry->height;
+		exportCacheEntry->size = cacheEntry->width * cacheEntry->height * 4;
+		exportCacheEntry->flags = 0;
+		exportCacheEntry->data = cacheEntry->data;
+		return CHANNEL_RC_OK;
+	}
+
+	return ERROR_NOT_FOUND;
+}
+
 /**
  * Function description
  *
@@ -1173,9 +1196,9 @@ UINT gdi_EvictCacheEntry(RdpgfxClientContext* context, RDPGFX_EVICT_CACHE_ENTRY_
 	{
 		free(cacheEntry->data);
 		free(cacheEntry);
-	}
 
-	context->SetCacheSlotData(context, evictCacheEntry->cacheSlot, NULL);
+		context->SetCacheSlotData(context, evictCacheEntry->cacheSlot, NULL);
+	}
 
 	return CHANNEL_RC_OK;
 }
@@ -1231,6 +1254,7 @@ void gdi_graphics_pipeline_init(rdpGdi* gdi, RdpgfxClientContext* gfx)
 	gfx->CacheToSurface = gdi_CacheToSurface;
 	gfx->CacheImportReply = gdi_CacheImportReply;
 	gfx->ImportCacheEntry = gdi_ImportCacheEntry;
+	gfx->ExportCacheEntry = gdi_ExportCacheEntry;
 	gfx->EvictCacheEntry = gdi_EvictCacheEntry;
 	gfx->MapSurfaceToOutput = gdi_MapSurfaceToOutput;
 	gfx->MapSurfaceToWindow = gdi_MapSurfaceToWindow;
@@ -1243,4 +1267,3 @@ void gdi_graphics_pipeline_uninit(rdpGdi* gdi, RdpgfxClientContext* gfx)
 	gdi->gfx = NULL;
 	gfx->custom = NULL;
 }
-

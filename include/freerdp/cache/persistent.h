@@ -97,6 +97,7 @@ FREERDP_API int persistent_cache_get_version(rdpPersistentCache* persistent);
 FREERDP_API int persistent_cache_get_count(rdpPersistentCache* persistent);
 
 FREERDP_API int persistent_cache_read_entry(rdpPersistentCache* persistent, PERSISTENT_CACHE_ENTRY* entry);
+FREERDP_API int persistent_cache_write_entry(rdpPersistentCache* persistent, PERSISTENT_CACHE_ENTRY* entry);
 
 FREERDP_API int persistent_cache_open(rdpPersistentCache* persistent, const char* filename, BOOL write, int version);
 FREERDP_API int persistent_cache_close(rdpPersistentCache* persistent);

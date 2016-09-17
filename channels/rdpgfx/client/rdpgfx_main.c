@@ -374,6 +374,53 @@ error:
 	return -1;
 }
 
+static int rdpgfx_save_persistent_cache(RDPGFX_PLUGIN* gfx)
+{
+	int index;
+	UINT16 cacheSlot;
+	PERSISTENT_CACHE_ENTRY cacheEntry;
+	rdpPersistentCache* persistent = NULL;
+	rdpSettings* settings = gfx->settings;
+	RdpgfxClientContext* context = (RdpgfxClientContext*) gfx->iface.pInterface;
+
+	if (!context || !context->ExportCacheEntry)
+		return 0;
+
+	if (!settings->BitmapCachePersistEnabled)
+		return 0;
+
+	if (!settings->BitmapCachePersistFile)
+		return 0;
+
+	persistent = persistent_cache_new();
+
+	if (!persistent)
+		return -1;
+
+	if (persistent_cache_open(persistent, settings->BitmapCachePersistFile, TRUE, 3) < 1)
+		goto error;
+
+	for (index = 0; index < gfx->MaxCacheSlot; index++)
+	{
+		if (gfx->CacheSlots[index])
+		{
+			cacheSlot = (UINT16) index;
+			
+			if (context->ExportCacheEntry(context, cacheSlot, &cacheEntry) != CHANNEL_RC_OK)
+				continue;
+
+			persistent_cache_write_entry(persistent, &cacheEntry);
+		}
+	}
+
+	persistent_cache_free(persistent);
+
+	return 1;
+error:
+	persistent_cache_free(persistent);
+	return -1;
+}
+
 /**
 * Function description
 *
@@ -1328,7 +1375,7 @@ static UINT rdpgfx_on_data_received(IWTSVirtualChannelCallback* pChannelCallback
 	RDPGFX_PLUGIN* gfx = (RDPGFX_PLUGIN*) callback->plugin;
 	UINT error = CHANNEL_RC_OK;
 
-	status = zgfx_decompress(gfx->zgfx, Stream_Pointer(data), Stream_GetRemainingLength(data), &pDstData, &DstSize, 0);
+	status = zgfx_decompress(gfx->zgfx, Stream_Pointer(data), (UINT32) Stream_GetRemainingLength(data), &pDstData, &DstSize, 0);
 
 	if (status < 0)
 	{
@@ -1386,6 +1433,8 @@ static UINT rdpgfx_on_close(IWTSVirtualChannelCallback* pChannelCallback)
 	RdpgfxClientContext* context = (RdpgfxClientContext*) gfx->iface.pInterface;
 
 	WLog_DBG(TAG, "OnClose");
+
+	rdpgfx_save_persistent_cache(gfx);
 
 	free(callback);
 
@@ -1638,7 +1687,7 @@ static UINT rdpgfx_get_surface_ids(RdpgfxClientContext* context, UINT16** ppSurf
 
 	for (index = 0; index < count; index++)
 	{
-		pSurfaceIds[index] = pKeys[index] - 1;
+		pSurfaceIds[index] = (UINT16) (pKeys[index] - 1);
 	}
 
 	free(pKeys);

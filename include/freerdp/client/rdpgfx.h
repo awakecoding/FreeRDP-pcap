@@ -45,7 +45,8 @@ typedef UINT (*pcRdpgfxSurfaceToCache)(RdpgfxClientContext* context, RDPGFX_SURF
 typedef UINT (*pcRdpgfxCacheToSurface)(RdpgfxClientContext* context, RDPGFX_CACHE_TO_SURFACE_PDU* cacheToSurface);
 typedef UINT (*pcRdpgfxCacheImportOffer)(RdpgfxClientContext* context, RDPGFX_CACHE_IMPORT_OFFER_PDU* cacheImportOffer);
 typedef UINT (*pcRdpgfxCacheImportReply)(RdpgfxClientContext* context, RDPGFX_CACHE_IMPORT_REPLY_PDU* cacheImportReply);
-typedef UINT(*pcRdpgfxImportCacheEntry)(RdpgfxClientContext* context, UINT16 cacheSlot, PERSISTENT_CACHE_ENTRY* importCacheEntry);
+typedef UINT (*pcRdpgfxImportCacheEntry)(RdpgfxClientContext* context, UINT16 cacheSlot, PERSISTENT_CACHE_ENTRY* importCacheEntry);
+typedef UINT (*pcRdpgfxExportCacheEntry)(RdpgfxClientContext* context, UINT16 cacheSlot, PERSISTENT_CACHE_ENTRY* importCacheEntry);
 typedef UINT (*pcRdpgfxEvictCacheEntry)(RdpgfxClientContext* context, RDPGFX_EVICT_CACHE_ENTRY_PDU* evictCacheEntry);
 typedef UINT (*pcRdpgfxMapSurfaceToOutput)(RdpgfxClientContext* context, RDPGFX_MAP_SURFACE_TO_OUTPUT_PDU* surfaceToOutput);
 typedef UINT (*pcRdpgfxMapSurfaceToWindow)(RdpgfxClientContext* context, RDPGFX_MAP_SURFACE_TO_WINDOW_PDU* surfaceToWindow);
@@ -75,6 +76,7 @@ struct _rdpgfx_client_context
 	pcRdpgfxCacheImportOffer CacheImportOffer;
 	pcRdpgfxCacheImportReply CacheImportReply;
 	pcRdpgfxImportCacheEntry ImportCacheEntry;
+	pcRdpgfxExportCacheEntry ExportCacheEntry;
 	pcRdpgfxEvictCacheEntry EvictCacheEntry;
 	pcRdpgfxMapSurfaceToOutput MapSurfaceToOutput;
 	pcRdpgfxMapSurfaceToWindow MapSurfaceToWindow;
