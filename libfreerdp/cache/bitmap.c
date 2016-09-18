@@ -91,9 +91,9 @@ BOOL update_gdi_cache_bitmap(rdpContext* context, CACHE_BITMAP_ORDER* cacheBitma
 	rdpCache* cache = context->cache;
 
 	bitmap = Bitmap_Alloc(context);
+
 	if (!bitmap)
 		return FALSE;
-
 
 	Bitmap_SetDimensions(context, bitmap, cacheBitmap->bitmapWidth, cacheBitmap->bitmapHeight);
 
@@ -125,8 +125,11 @@ BOOL update_gdi_cache_bitmap_v2(rdpContext* context, CACHE_BITMAP_V2_ORDER* cach
 	rdpSettings* settings = context->settings;
 
 	bitmap = Bitmap_Alloc(context);
+
 	if (!bitmap)
 		return FALSE;
+
+	bitmap->key64 = ((UINT64) cacheBitmapV2->key1 | (((UINT64) cacheBitmapV2->key2) << 32));
 
 	Bitmap_SetDimensions(context, bitmap, cacheBitmapV2->bitmapWidth, cacheBitmapV2->bitmapHeight);
 
@@ -166,8 +169,11 @@ BOOL update_gdi_cache_bitmap_v3(rdpContext* context, CACHE_BITMAP_V3_ORDER* cach
 	BITMAP_DATA_EX* bitmapData = &cacheBitmapV3->bitmapData;
 
 	bitmap = Bitmap_Alloc(context);
+
 	if (!bitmap)
 		return FALSE;
+
+	bitmap->key64 = ((UINT64) cacheBitmapV3->key1 | (((UINT64) cacheBitmapV3->key2) << 32));
 
 	Bitmap_SetDimensions(context, bitmap, bitmapData->width, bitmapData->height);
 
@@ -305,16 +311,18 @@ void bitmap_cache_register_callbacks(rdpUpdate* update)
 
 int bitmap_cache_load_persistent(rdpBitmapCache* bitmapCache)
 {
+	int index;
+	int count;
 	int status;
-	int version;
 	rdpPersistentCache* persistent;
+	PERSISTENT_CACHE_ENTRY cacheEntry;
 	rdpSettings* settings = bitmapCache->settings;
 
 	if (!settings->BitmapCachePersistEnabled)
-		return 1;
+		return 0;
 
 	if (!settings->BitmapCachePersistFile)
-		return 1;
+		return 0;
 
 	persistent = persistent_cache_new();
 
@@ -324,11 +332,78 @@ int bitmap_cache_load_persistent(rdpBitmapCache* bitmapCache)
 	status = persistent_cache_open(persistent, settings->BitmapCachePersistFile, FALSE, -1);
 
 	if (status < 1)
+		goto error;
+
+	count = persistent_cache_get_count(persistent);
+
+	for (index = 0; index < count; index++)
+	{
+		if (persistent_cache_read_entry(persistent, &cacheEntry) < 1)
+			continue;
+	}
+
+	persistent_cache_free(persistent);
+	return 1;
+
+error:
+	persistent_cache_free(persistent);
+	return -1;
+}
+
+int bitmap_cache_save_persistent(rdpBitmapCache* bitmapCache)
+{
+	int i, j;
+	int status;
+	int version;
+	rdpBitmap* bitmap;
+	rdpPersistentCache* persistent;
+	PERSISTENT_CACHE_ENTRY cacheEntry;
+	rdpSettings* settings = bitmapCache->settings;
+
+	version = settings->BitmapCacheVersion;
+
+	if (!settings->BitmapCachePersistEnabled)
+		return 0;
+
+	if (!settings->BitmapCachePersistFile)
+		return 0;
+
+	persistent = persistent_cache_new();
+
+	if (!persistent)
 		return -1;
 
-	version = persistent_cache_get_version(persistent);
+	status = persistent_cache_open(persistent, settings->BitmapCachePersistFile, TRUE, version);
 
+	if (status < 1)
+		goto error;
+
+	for (i = 0; i < (int) bitmapCache->maxCells; i++)
+	{
+		for (j = 0; j < (int) bitmapCache->cells[i].number + 1; j++)
+		{
+			bitmap = bitmapCache->cells[i].entries[j];
+
+			if (!bitmap || !bitmap->key64)
+				continue;
+
+			cacheEntry.key64 = bitmap->key64;
+			cacheEntry.width = bitmap->width;
+			cacheEntry.height = bitmap->height;
+			cacheEntry.size = (UINT32) (bitmap->width * bitmap->height * 4);
+			cacheEntry.flags = 0;
+			cacheEntry.data = bitmap->data;
+
+			persistent_cache_write_entry(persistent, &cacheEntry);
+		}
+	}
+
+	persistent_cache_free(persistent);
 	return 1;
+
+error:
+	persistent_cache_free(persistent);
+	return -1;
 }
 
 rdpBitmapCache* bitmap_cache_new(rdpSettings* settings)
@@ -362,8 +437,6 @@ rdpBitmapCache* bitmap_cache_new(rdpSettings* settings)
 		bitmapCache->cells[i].entries = (rdpBitmap**) calloc((bitmapCache->cells[i].number + 1), sizeof(rdpBitmap*));
 	}
 
-	bitmap_cache_load_persistent(bitmapCache);
-
 	return bitmapCache;
 }
 
@@ -374,6 +447,8 @@ void bitmap_cache_free(rdpBitmapCache* bitmapCache)
 
 	if (!bitmapCache)
 		return;
+
+	bitmap_cache_save_persistent(bitmapCache);
 
 	for (i = 0; i < (int) bitmapCache->maxCells; i++)
 	{
