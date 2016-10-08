@@ -53,6 +53,35 @@ static BYTE CLEAR_8BIT_MASKS[9] =
 	0x00, 0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF
 };
 
+void clear_reset_vbar_storage(CLEAR_CONTEXT* clear)
+{
+	int i;
+
+	for (i = 0; i < 32768; i++)
+		free(clear->VBarStorage[i].pixels);
+
+	ZeroMemory(clear->VBarStorage, sizeof(clear->VBarStorage));
+
+	clear->VBarStorageCursor = 0;
+
+	for (i = 0; i < 16384; i++)
+		free(clear->ShortVBarStorage[i].pixels);
+
+	ZeroMemory(clear->ShortVBarStorage, sizeof(clear->ShortVBarStorage));
+
+	clear->ShortVBarStorageCursor = 0;
+}
+
+void clear_reset_glyph_cache(CLEAR_CONTEXT* clear)
+{
+	int i;
+	
+	for (i = 0; i < 4000; i++)
+		free(clear->GlyphCache[i].pixels);
+
+	ZeroMemory(clear->GlyphCache, sizeof(clear->GlyphCache));
+}
+
 int clear_decompress(CLEAR_CONTEXT* clear, BYTE* pSrcData, UINT32 SrcSize,
 		BYTE** ppDstData, DWORD DstFormat, int nDstStep, int nXDst, int nYDst, int nWidth, int nHeight)
 {
@@ -111,10 +140,7 @@ int clear_decompress(CLEAR_CONTEXT* clear, BYTE* pSrcData, UINT32 SrcSize,
 	clear->seqNumber = (seqNumber + 1) % 256;
 
 	if (glyphFlags & CLEARCODEC_FLAG_CACHE_RESET)
-	{
-		clear->VBarStorageCursor = 0;
-		clear->ShortVBarStorageCursor = 0;
-	}
+		clear_reset_vbar_storage(clear);
 
 	if ((glyphFlags & CLEARCODEC_FLAG_GLYPH_HIT) && !(glyphFlags & CLEARCODEC_FLAG_GLYPH_INDEX))
 		return -1006;
@@ -835,9 +861,12 @@ BOOL clear_context_reset(CLEAR_CONTEXT* clear)
 	if (!clear)
 		return FALSE;
 
+	/**
+	 * The ClearCodec context is not bound to a particular surface,
+	 * and its internal caches must NOT be reset on the ResetGraphics PDU.
+	 */
+
 	clear->seqNumber = 0;
-	clear->VBarStorageCursor = 0;
-	clear->ShortVBarStorageCursor = 0;
 
 	return TRUE;
 }
@@ -877,8 +906,6 @@ error_nsc:
 
 void clear_context_free(CLEAR_CONTEXT* clear)
 {
-	int i;
-
 	if (!clear)
 		return;
 
@@ -886,14 +913,8 @@ void clear_context_free(CLEAR_CONTEXT* clear)
 
 	free(clear->TempBuffer);
 
-	for (i = 0; i < 4000; i++)
-		free(clear->GlyphCache[i].pixels);
-
-	for (i = 0; i < 32768; i++)
-		free(clear->VBarStorage[i].pixels);
-
-	for (i = 0; i < 16384; i++)
-		free(clear->ShortVBarStorage[i].pixels);
+	clear_reset_vbar_storage(clear);
+	clear_reset_glyph_cache(clear);
 
 	free(clear);
 }
