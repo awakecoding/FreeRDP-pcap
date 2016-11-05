@@ -362,6 +362,9 @@ int bitmap_cache_save_persistent(rdpBitmapCache* bitmapCache)
 
 	version = settings->BitmapCacheVersion;
 
+	if (version != 2)
+		return 0; /* persistent bitmap cache already saved in egfx channel */
+
 	if (!settings->BitmapCachePersistEnabled)
 		return 0;
 

@@ -343,7 +343,7 @@ static int rdpgfx_load_cache_import_offer(RDPGFX_PLUGIN* gfx, RDPGFX_CACHE_IMPOR
 	if (!persistent)
 		return -1;
 
-	if (persistent_cache_open(persistent, settings->BitmapCachePersistFile, FALSE, -1) < 1)
+	if (persistent_cache_open(persistent, settings->BitmapCachePersistFile, FALSE, 3) < 1)
 		goto error;
 
 	if (persistent_cache_get_version(persistent) != 3)
@@ -503,7 +503,7 @@ static int rdpgfx_load_cache_import_reply(RDPGFX_PLUGIN* gfx, RDPGFX_CACHE_IMPOR
 	if (!persistent)
 		return -1;
 
-	if (persistent_cache_open(persistent, settings->BitmapCachePersistFile, FALSE, -1) < 1)
+	if (persistent_cache_open(persistent, settings->BitmapCachePersistFile, FALSE, 3) < 1)
 		goto error;
 
 	if (persistent_cache_get_version(persistent) != 3)

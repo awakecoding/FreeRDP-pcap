@@ -469,6 +469,8 @@ bool RdpDecoder::args(int argc, char** argv)
 	if (!settings)
 		return false;
 
+	m_settings = settings;
+
 	status = freerdp_client_settings_parse_command_line(settings, argc, argv, TRUE);
 
 	if (status < 0)
