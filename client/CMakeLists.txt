@@ -32,6 +32,8 @@ if(FREERDP_VENDOR AND WITH_CLIENT)
 		endif()
 	endif()
 
+	add_subdirectory(Packet)
+
 	if(WITH_X11)
 		add_subdirectory(X11)
 	endif()
