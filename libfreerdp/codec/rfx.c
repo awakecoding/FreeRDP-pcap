@@ -482,25 +482,34 @@ static BOOL rfx_process_message_codec_versions(RFX_CONTEXT* context, wStream* s)
 	}
 
 	Stream_Read_UINT8(s, numCodecs); /* numCodecs (1 byte), must be set to 0x01 */
-	Stream_Read_UINT8(s, context->codec_id); /* codecId (1 byte), must be set to 0x01 */
-	Stream_Read_UINT16(s, context->codec_version); /* version (2 bytes), must be set to WF_VERSION_1_0 (0x0100)  */
 
-	if (numCodecs != 1)
+	if (!numCodecs)
 	{
-		WLog_ERR(TAG, "%s: numCodes is 0x%02X (must be 0x01)", __FUNCTION__, numCodecs);
-		return FALSE;
+		context->codec_id = 0x01;
+		context->codec_version = WF_VERSION_1_0;
 	}
-
-	if (context->codec_id != 0x01)
+	else
 	{
-		WLog_ERR(TAG, "%s: invalid codec id (0x%02X)", __FUNCTION__, context->codec_id);
-		return FALSE;
-	}
+		if (numCodecs != 1)
+		{
+			WLog_ERR(TAG, "%s: numCodecs is 0x%02X (must be 0x01)", __FUNCTION__, numCodecs);
+			return FALSE;
+		}
 
-	if (context->codec_version != WF_VERSION_1_0)
-	{
-		WLog_ERR(TAG, "%s: invalid codec version (0x%04X)", __FUNCTION__, context->codec_version);
-		return FALSE;
+		Stream_Read_UINT8(s, context->codec_id); /* codecId (1 byte), must be set to 0x01 */
+		Stream_Read_UINT16(s, context->codec_version); /* version (2 bytes), must be set to WF_VERSION_1_0 (0x0100)  */
+
+		if (context->codec_id != 0x01)
+		{
+			WLog_ERR(TAG, "%s: invalid codec id (0x%02X)", __FUNCTION__, context->codec_id);
+			return FALSE;
+		}
+
+		if (context->codec_version != WF_VERSION_1_0)
+		{
+			WLog_ERR(TAG, "%s: invalid codec version (0x%04X)", __FUNCTION__, context->codec_version);
+			return FALSE;
+		}
 	}
 
 	WLog_Print(context->priv->log, WLOG_DEBUG, "id %d version 0x%X.", context->codec_id, context->codec_version);
@@ -550,6 +559,9 @@ static BOOL rfx_process_message_channels(RFX_CONTEXT* context, wStream* s)
 	Stream_Read_UINT16(s, context->width); /* width (2 bytes) */
 	Stream_Read_UINT16(s, context->height); /* height (2 bytes) */
 
+	if (!context->width)
+		context->width = context->height;
+
 	if (!context->width || !context->height)
 	{
 		WLog_ERR(TAG, "%s: invalid channel with/height: %ux%u", __FUNCTION__, context->width, context->height);
@@ -583,6 +595,9 @@ static BOOL rfx_process_message_context(RFX_CONTEXT* context, wStream* s)
 	Stream_Read_UINT8(s, ctxId); /* ctxId (1 byte), must be set to 0x00 */
 	Stream_Read_UINT16(s, tileSize); /* tileSize (2 bytes), must be set to CT_TILE_64x64 (0x0040) */
 	Stream_Read_UINT16(s, properties); /* properties (2 bytes) */
+
+	if (!tileSize)
+		tileSize = CT_TILE_64x64;
 
 	WLog_Print(context->priv->log, WLOG_DEBUG, "ctxId %d tileSize %d properties 0x%X.",
 			ctxId, tileSize, properties);
@@ -1022,6 +1037,25 @@ RFX_MESSAGE* rfx_process_message(RFX_CONTEXT* context, BYTE* data, UINT32 length
 
 		WLog_Print(context->priv->log, WLOG_DEBUG, "blockType 0x%X blockLen %d", blockType, blockLen);
 
+		if (!blockLen)
+		{
+			switch (blockType)
+			{
+				case WBT_SYNC:
+					blockLen = 12;
+					break;
+				case WBT_CODEC_VERSIONS:
+					blockLen = 10;
+					break;
+				case WBT_CHANNELS:
+					blockLen = 12;
+					break;
+				case WBT_FRAME_BEGIN:
+					blockLen = 14;
+					break;
+			}
+		}
+
 		if (blockLen == 0)
 		{
 			WLog_ERR(TAG, "zero blockLen");
@@ -1053,6 +1087,9 @@ RFX_MESSAGE* rfx_process_message(RFX_CONTEXT* context, BYTE* data, UINT32 length
 
 			Stream_Read_UINT8(s, codecId); /* codecId (1 byte) must be set to 0x01 */
 			Stream_Read_UINT8(s, channelId); /* channelId (1 byte) 0xFF or 0x00, see below */
+
+			if (!codecId)
+				codecId = 0x01;
 
 			if (codecId != 0x01)
 			{
