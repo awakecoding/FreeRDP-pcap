@@ -976,6 +976,15 @@ BOOL freerdp_get_param_bool(rdpSettings* settings, int id)
 		case FreeRDP_PlayRemoteFx:
 			return settings->PlayRemoteFx;
 
+		case FreeRDP_ExternalTransport:
+			return settings->ExternalTransport;
+
+		case FreeRDP_ExternalSecurity:
+			return settings->ExternalSecurity;
+
+		case FreeRDP_ReplayMode:
+			return settings->ReplayMode;
+
 		case FreeRDP_GatewayUseSameCredentials:
 			return settings->GatewayUseSameCredentials;
 
@@ -1454,6 +1463,18 @@ int freerdp_set_param_bool(rdpSettings* settings, int id, BOOL param)
 
 		case FreeRDP_PlayRemoteFx:
 			settings->PlayRemoteFx = param;
+			break;
+
+		case FreeRDP_ExternalTransport:
+			settings->ExternalTransport = param;
+			break;
+
+		case FreeRDP_ExternalSecurity:
+			settings->ExternalSecurity = param;
+			break;
+
+		case FreeRDP_ReplayMode:
+			settings->ReplayMode = param;
 			break;
 
 		case FreeRDP_GatewayUseSameCredentials:
@@ -2542,6 +2563,9 @@ char* freerdp_get_param_string(rdpSettings* settings, int id)
 		case FreeRDP_RemoteApplicationCmdLine:
 			return settings->RemoteApplicationCmdLine;
 
+		case FreeRDP_BitmapCachePersistFile:
+			return settings->BitmapCachePersistFile;
+
 		case FreeRDP_ImeFileName:
 			return settings->ImeFileName;
 
@@ -2761,6 +2785,10 @@ int freerdp_set_param_string(rdpSettings* settings, int id, const char* param)
 
 		case FreeRDP_RemoteApplicationCmdLine:
 			tmp = &settings->RemoteApplicationCmdLine;
+			break;
+
+		case FreeRDP_BitmapCachePersistFile:
+			tmp = &settings->BitmapCachePersistFile;
 			break;
 
 		case FreeRDP_ImeFileName:
