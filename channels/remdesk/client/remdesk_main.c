@@ -885,6 +885,7 @@ static UINT remdesk_virtual_channel_event_data_received(remdeskPlugin* remdesk,
 			return ERROR_INTERNAL_ERROR;
 		}
 	}
+
 	return CHANNEL_RC_OK;
 }
 
@@ -904,6 +905,9 @@ static VOID VCAPITYPE remdesk_virtual_channel_open_event(DWORD openHandle, UINT 
 
 	switch (event)
 	{
+		case CHANNEL_EVENT_INITIALIZED:
+			break;
+
 		case CHANNEL_EVENT_DATA_RECEIVED:
 			if ((error = remdesk_virtual_channel_event_data_received(remdesk, pData, dataLength, totalLength, dataFlags)))
 				WLog_ERR(TAG, "remdesk_virtual_channel_event_data_received failed with error %lu!", error);
@@ -919,6 +923,7 @@ static VOID VCAPITYPE remdesk_virtual_channel_open_event(DWORD openHandle, UINT 
 		default:
 			WLog_ERR(TAG, "unhandled event %lu!", event);
 			error = ERROR_INTERNAL_ERROR;
+			break;
 
 	}
 	if (error && remdesk->rdpcontext)

@@ -1276,6 +1276,9 @@ static VOID VCAPITYPE encomsp_virtual_channel_init_event(LPVOID pInitHandle,
 
 	switch (event)
 	{
+		case CHANNEL_EVENT_INITIALIZED:
+			break;
+
 		case CHANNEL_EVENT_CONNECTED:
 			if ((error = encomsp_virtual_channel_event_connected(encomsp, pData, dataLength)))
 				WLog_ERR(TAG, "encomsp_virtual_channel_event_connected failed with error %lu", error);
@@ -1291,6 +1294,7 @@ static VOID VCAPITYPE encomsp_virtual_channel_init_event(LPVOID pInitHandle,
 			break;
 		default:
 			WLog_ERR(TAG, "Unhandled event type %d", event);
+			break;
 	}
 
 	if (error && encomsp->rdpcontext)
