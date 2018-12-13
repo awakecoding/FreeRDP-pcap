@@ -152,6 +152,8 @@ static COMMAND_LINE_ARGUMENT_A args[] =
 	{ "mouse-motion", COMMAND_LINE_VALUE_BOOL, NULL, BoolValueTrue, NULL, -1, NULL, "mouse-motion" },
 	{ "parent-window", COMMAND_LINE_VALUE_REQUIRED, "<window id>", NULL, NULL, -1, NULL, "Parent window id" },
 	{ "bitmap-cache", COMMAND_LINE_VALUE_BOOL, NULL, BoolValueTrue, NULL, -1, NULL, "Enable bitmap cache" },
+	{ "persist-cache", COMMAND_LINE_VALUE_BOOL, NULL, BoolValueFalse, NULL, -1, NULL, "persistent bitmap cache" },
+	{ "persist-cache-file", COMMAND_LINE_VALUE_REQUIRED, "<filename>", NULL, NULL, -1, NULL, "persistent bitmap cache file" },
 	{ "offscreen-cache", COMMAND_LINE_VALUE_BOOL, NULL, BoolValueTrue, NULL, -1, NULL, "Enable offscreen bitmap cache" },
 	{ "glyph-cache", COMMAND_LINE_VALUE_BOOL, NULL, BoolValueTrue, NULL, -1, NULL, "Glyph cache" },
 	{ "codec-cache", COMMAND_LINE_VALUE_REQUIRED, "<rfx|nsc|jpeg>", NULL, NULL, -1, NULL, "bitmap codec cache" },
@@ -2633,6 +2635,14 @@ BOOL freerdp_client_load_addins(rdpChannels* channels, rdpSettings* settings)
 		settings->RemdeskVirtualChannel = TRUE;
 	}
 
+	for (index = 0; index < settings->StaticChannelCount; index++)
+	{
+		args = settings->StaticChannelArray[index];
+
+		if (!freerdp_client_load_static_channel_addin(channels, settings, args->argv[0], args))
+			return FALSE;
+	}
+
 	if (settings->EncomspVirtualChannel)
 	{
 		if (!freerdp_client_load_static_channel_addin(channels, settings, "encomsp", settings))
@@ -2642,13 +2652,6 @@ BOOL freerdp_client_load_addins(rdpChannels* channels, rdpSettings* settings)
 	if (settings->RemdeskVirtualChannel)
 	{
 		if (!freerdp_client_load_static_channel_addin(channels, settings, "remdesk", settings))
-			return FALSE;
-	}
-
-	for (index = 0; index < settings->StaticChannelCount; index++)
-	{
-		args = settings->StaticChannelArray[index];
-		if (!freerdp_client_load_static_channel_addin(channels, settings, args->argv[0], args))
 			return FALSE;
 	}
 
