@@ -629,6 +629,7 @@ rdpSettings* freerdp_settings_clone(rdpSettings* settings)
 		CHECKED_STRDUP(RemoteApplicationFile); /* 2116 */
 		CHECKED_STRDUP(RemoteApplicationGuid); /* 2117 */
 		CHECKED_STRDUP(RemoteApplicationCmdLine); /* 2118 */
+		CHECKED_STRDUP(BitmapCachePersistFile); /* 2503 */
 		CHECKED_STRDUP(ImeFileName); /* 2628 */
 		CHECKED_STRDUP(DrivesToRedirect); /* 4290 */
 
@@ -942,6 +943,7 @@ void freerdp_settings_free(rdpSettings* settings)
     free(settings->ServerAutoReconnectCookie);
     free(settings->ClientTimeZone);
     free(settings->BitmapCacheV2CellInfo);
+    free(settings->BitmapCachePersistFile);
     free(settings->GlyphCache);
     free(settings->FragCache);
     key_free(settings->RdpServerRsaKey);
