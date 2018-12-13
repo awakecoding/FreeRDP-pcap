@@ -30,6 +30,8 @@
 #include <freerdp/graphics.h>
 #include <freerdp/codec/bitmap.h>
 
+#include "surface.h"
+
 #include "orders.h"
 
 #define TAG FREERDP_TAG("core.orders")
@@ -2124,10 +2126,10 @@ BOOL update_write_cache_bitmap_v2_order(wStream* s, CACHE_BITMAP_V2_ORDER* cache
 
 BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_bitmap_v3, UINT16 flags)
 {
+	BYTE reserved1;
+	BYTE reserved2;
 	BYTE bitsPerPixelId;
 	BITMAP_DATA_EX* bitmapData;
-	UINT32 new_len;
-	BYTE *new_data;
 
 	cache_bitmap_v3->cacheId = flags & 0x00000003;
 	cache_bitmap_v3->flags = (flags & 0x0000FF80) >> 7;
@@ -2135,7 +2137,7 @@ BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_
 	bitsPerPixelId = (flags & 0x00000078) >> 3;
 	cache_bitmap_v3->bpp = CBR23_BPP[bitsPerPixelId];
 
-	if (Stream_GetRemainingLength(s) < 21)
+	if (Stream_GetRemainingLength(s) < 22)
 		return FALSE;
 
 	Stream_Read_UINT16(s, cache_bitmap_v3->cacheIndex); /* cacheIndex (2 bytes) */
@@ -2145,27 +2147,44 @@ BOOL update_read_cache_bitmap_v3_order(wStream* s, CACHE_BITMAP_V3_ORDER* cache_
 	bitmapData = &cache_bitmap_v3->bitmapData;
 
 	Stream_Read_UINT8(s, bitmapData->bpp);
+
 	if ((bitmapData->bpp < 1) || (bitmapData->bpp > 32))
 	{
 		WLog_ERR(TAG, "invalid bpp value %d", bitmapData->bpp);
 		return FALSE;
 	}
-	Stream_Seek_UINT8(s); /* reserved1 (1 byte) */
-	Stream_Seek_UINT8(s); /* reserved2 (1 byte) */
+
+	Stream_Read_UINT8(s, reserved1); /* flags (1 byte) */
+	Stream_Read_UINT8(s, reserved2); /* reserved2 (1 byte) */
 	Stream_Read_UINT8(s, bitmapData->codecID); /* codecID (1 byte) */
 	Stream_Read_UINT16(s, bitmapData->width); /* width (2 bytes) */
 	Stream_Read_UINT16(s, bitmapData->height); /* height (2 bytes) */
-	Stream_Read_UINT32(s, new_len); /* length (4 bytes) */
+	Stream_Read_UINT32(s, bitmapData->length); /* length (4 bytes) */
 
-	if (Stream_GetRemainingLength(s) < new_len)
+	if (reserved1 & TS_COMPRESSED_BITMAP_EX_HEADER_FLAG)
+	{
+		UINT32 key1;
+		UINT32 key2;
+		UINT64 tmMilli;
+		UINT64 tmSec;
+
+		if (Stream_GetRemainingLength(s) < 24)
+			return FALSE;
+
+		Stream_Read_UINT32(s, key1); /* key1 (4 bytes) */
+		Stream_Read_UINT32(s, key2); /* key2 (4 bytes) */
+		Stream_Read_UINT64(s, tmMilli); /* tmMilli (8 bytes) */
+		Stream_Read_UINT64(s, tmSec); /* tmSec (8 bytes) */
+	}
+
+	if (Stream_GetRemainingLength(s) < bitmapData->length)
 		return FALSE;
 
-	new_data = (BYTE*) realloc(bitmapData->data, new_len);
-	if (!new_data)
-		return FALSE;
-	bitmapData->data = new_data;
-	bitmapData->length = new_len;
-	Stream_Read(s, bitmapData->data, bitmapData->length);
+	Stream_GetPointer(s, bitmapData->data);
+	Stream_Seek(s, bitmapData->length);
+
+	if (bitmapData->codecID == 5)
+		bitmapData->codecID = RDP_CODEC_ID_IMAGE_REMOTEFX;
 
 	return TRUE;
 }
