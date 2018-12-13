@@ -155,7 +155,7 @@ static BOOL update_gdi_cache_bitmap_v2(rdpContext* context,
 
 	bitmap->key64 = ((UINT64) cacheBitmapV2->key1 | (((UINT64) cacheBitmapV2->key2) << 32));
 
-	Bitmap_SetDimensions(context, bitmap, cacheBitmapV2->bitmapWidth, cacheBitmapV2->bitmapHeight);
+	Bitmap_SetDimensions(bitmap, cacheBitmapV2->bitmapWidth, cacheBitmapV2->bitmapHeight);
 
 	if (!cacheBitmapV2->bitmapBpp)
 		cacheBitmapV2->bitmapBpp = settings->ColorDepth;
@@ -209,7 +209,7 @@ static BOOL update_gdi_cache_bitmap_v3(rdpContext* context,
 
 	bitmap->key64 = ((UINT64) cacheBitmapV3->key1 | (((UINT64) cacheBitmapV3->key2) << 32));
 
-	Bitmap_SetDimensions(context, bitmap, bitmapData->width, bitmapData->height);
+	Bitmap_SetDimensions(bitmap, bitmapData->width, bitmapData->height);
 
 	if (!cacheBitmapV3->bpp)
 		cacheBitmapV3->bpp = settings->ColorDepth;
@@ -454,9 +454,6 @@ void bitmap_cache_free(rdpBitmapCache* bitmapCache)
 
 		free(bitmapCache->cells[i].entries);
 	}
-
-	if (bitmapCache->bitmap)
-		Bitmap_Free(bitmapCache->context, bitmapCache->bitmap);
 
 	persistent_cache_free(bitmapCache->persistent);
 	

@@ -1084,8 +1084,6 @@ static UINT gdi_SurfaceToCache(RdpgfxClientContext* context,
 	cacheEntry->cacheKey = surfaceToCache->cacheKey;
 	cacheEntry->width = (UINT32) (rect->right - rect->left);
 	cacheEntry->height = (UINT32) (rect->bottom - rect->top);
-	cacheEntry->alpha = surface->alpha;
-	cacheEntry->format = (!gdi->invert) ? PIXEL_FORMAT_XRGB32 : PIXEL_FORMAT_XBGR32;
 	cacheEntry->width = (UINT32)(rect->right - rect->left);
 	cacheEntry->height = (UINT32)(rect->bottom - rect->top);
 	cacheEntry->format = surface->format;
@@ -1183,10 +1181,9 @@ static UINT gdi_CacheImportReply(RdpgfxClientContext* context,
 {
 	UINT16 index;
 	UINT16 count;
-	UINT16* slots;
+	const UINT16* slots;
 	UINT16 cacheSlot;
 	gdiGfxCacheEntry* cacheEntry;
-	rdpGdi* gdi = (rdpGdi*) context->custom;
 
 	slots = cacheImportReply->cacheSlots;
 	count = cacheImportReply->importedEntriesCount;
@@ -1207,10 +1204,7 @@ static UINT gdi_CacheImportReply(RdpgfxClientContext* context,
 
 		cacheEntry->width = 0;
 		cacheEntry->height = 0;
-		cacheEntry->alpha = FALSE;
-
-		cacheEntry->format = (!gdi->invert) ? PIXEL_FORMAT_XRGB32 : PIXEL_FORMAT_XBGR32;
-
+		cacheEntry->format = PIXEL_FORMAT_XRGB32;
 		cacheEntry->scanline = (cacheEntry->width + (cacheEntry->width % 4)) * 4;
 		cacheEntry->data = NULL;
 
@@ -1223,7 +1217,6 @@ static UINT gdi_CacheImportReply(RdpgfxClientContext* context,
 UINT gdi_ImportCacheEntry(RdpgfxClientContext* context, UINT16 cacheSlot, PERSISTENT_CACHE_ENTRY* importCacheEntry)
 {
 	gdiGfxCacheEntry* cacheEntry;
-	rdpGdi* gdi = (rdpGdi*) context->custom;
 
 	cacheEntry = (gdiGfxCacheEntry*) calloc(1, sizeof(gdiGfxCacheEntry));
 
@@ -1233,10 +1226,7 @@ UINT gdi_ImportCacheEntry(RdpgfxClientContext* context, UINT16 cacheSlot, PERSIS
 	cacheEntry->cacheKey = importCacheEntry->key64;
 	cacheEntry->width = (UINT32) importCacheEntry->width;
 	cacheEntry->height = (UINT32) importCacheEntry->height;
-	cacheEntry->alpha = FALSE;
-
-	cacheEntry->format = (!gdi->invert) ? PIXEL_FORMAT_XRGB32 : PIXEL_FORMAT_XBGR32;
-
+	cacheEntry->format = PIXEL_FORMAT_XRGB32;
 	cacheEntry->scanline = (cacheEntry->width + (cacheEntry->width % 4)) * 4;
 	cacheEntry->data = (BYTE*) calloc(1, cacheEntry->scanline * cacheEntry->height);
 
@@ -1248,7 +1238,7 @@ UINT gdi_ImportCacheEntry(RdpgfxClientContext* context, UINT16 cacheSlot, PERSIS
 
 	freerdp_image_copy(cacheEntry->data, cacheEntry->format, cacheEntry->scanline,
 		0, 0, cacheEntry->width, cacheEntry->height, importCacheEntry->data,
-		PIXEL_FORMAT_XRGB32, -1, 0, 0, NULL);
+		PIXEL_FORMAT_XRGB32, -1, 0, 0, NULL, FREERDP_FLIP_NONE);
 
 	context->SetCacheSlotData(context, cacheSlot, (void*) cacheEntry);
 
@@ -1258,7 +1248,6 @@ UINT gdi_ImportCacheEntry(RdpgfxClientContext* context, UINT16 cacheSlot, PERSIS
 UINT gdi_ExportCacheEntry(RdpgfxClientContext* context, UINT16 cacheSlot, PERSISTENT_CACHE_ENTRY* exportCacheEntry)
 {
 	gdiGfxCacheEntry* cacheEntry;
-	rdpGdi* gdi = (rdpGdi*) context->custom;
 
 	cacheEntry = (gdiGfxCacheEntry*) context->GetCacheSlotData(context, cacheSlot);
 
