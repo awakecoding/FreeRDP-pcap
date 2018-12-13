@@ -1058,7 +1058,7 @@ static BOOL gdi_surface_bits(rdpContext* context, SURFACE_BITS_COMMAND* cmd)
 		cmd->destLeft, cmd->destTop, cmd->destRight, cmd->destBottom,
 		cmd->bpp, cmd->codecID, cmd->width, cmd->height, cmd->bitmapDataLength);
 
-	if (cmd->codecID == RDP_CODEC_ID_REMOTEFX)
+	if ((cmd->codecID == RDP_CODEC_ID_REMOTEFX) || (cmd->codecID == RDP_CODEC_ID_IMAGE_REMOTEFX))
 	{
 		if (!freerdp_client_codecs_prepare(gdi->codecs, FREERDP_CODEC_REMOTEFX,
 										   gdi->width, gdi->height))

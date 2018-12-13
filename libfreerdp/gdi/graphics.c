@@ -171,7 +171,58 @@ BOOL gdi_Bitmap_Decompress(rdpContext* context, rdpBitmap* bitmap,
 
 	if (compressed)
 	{
-		if (bpp < 32)
+		if ((codecId == RDP_CODEC_ID_REMOTEFX) || (codecId == RDP_CODEC_ID_IMAGE_REMOTEFX))
+		{
+			RFX_TILE* tile;
+			RFX_RECT* rect;
+			RFX_MESSAGE* message;
+
+			if (!freerdp_client_codecs_prepare(context->codecs, FREERDP_CODEC_REMOTEFX, gdi->width, gdi->height))
+				return FALSE;
+
+			message = rfx_process_message(context->codecs->rfx, pSrcData, SrcSize);
+
+			if (!message)
+			{
+				WLog_ERR(TAG, "rfx_process_message failure");
+				return FALSE;
+			}
+
+			if ((message->numTiles == 1) && (message->numRects == 1) && (width <= 64) && (height <= 64))
+			{
+				tile = message->tiles[0];
+				rect = &message->rects[0];
+
+				freerdp_image_copy(pDstData, PIXEL_FORMAT_XRGB32, width * 4, 0, 0,
+					width, height, tile->data, PIXEL_FORMAT_XRGB32, 64 * 4, 0, 0, NULL);
+			}
+			else
+			{
+				WLog_WARN(TAG, "RfxMessage: numTiles: %d numRects: %d width: %d height: %d",
+					message->numTiles, message->numRects, width, height);
+			}
+
+			rfx_message_free(context->codecs->rfx, message);
+
+			status = 1;
+		}
+		else if (codecId == RDP_CODEC_ID_NSCODEC)
+		{
+			if (!freerdp_client_codecs_prepare(context->codecs, FREERDP_CODEC_NSCODEC, gdi->width, gdi->height))
+				return FALSE;
+
+			status = nsc_process_message(context->codecs->nsc, 32, width, height, pSrcData, SrcSize);
+
+			if (status < 1)
+			{
+				WLog_ERR(TAG, "nsc_process_message failure");
+				return FALSE;
+			}
+
+			status = freerdp_image_copy(pDstData, gdi->format, -1, 0, 0,
+				width, height, context->codecs->nsc->BitmapData, PIXEL_FORMAT_XRGB32, -1, 0, 0, gdi->palette);
+		}
+		else if (bpp < 32)
 		{
 			if (!freerdp_client_codecs_prepare(gdi->codecs, FREERDP_CODEC_INTERLEAVED,
 											   gdi->width, gdi->height))
